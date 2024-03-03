@@ -146,12 +146,16 @@ app.layout = html.Div([
 
                                                          dbc.Col(
                                                             children = dcc.Graph(id='markowitz-graph',
-                                                                       clear_on_unhover=True)
+                                                                                figure=go.Figure(),
+                                                                       clear_on_unhover=True,
+                                                                       )
                                                          ),
 
                                                          dbc.Col(
                                                              children=[
                                                                  dcc.Graph(id='portfolio-value',
+                                                                           figure=go.Figure(),
+                                                                           
                                                                    )
                                                              ]
                                                          )
@@ -209,27 +213,34 @@ def select_assets(tickers, investment_start_date, window, riskFreeRate):
 
     stocks_mv, minVar_portfolio, maxSharpe_portfolio, efficient_frontier = basket.mv_analysis(investment_start_date)
 
-    fig = px.scatter(stocks_mv, x='Risk', y='Return', text=stocks_mv.index).update_traces(marker=dict(size=10), name='Assets')
+    fig = px.scatter(stocks_mv, x='Risk', y='Return', text=stocks_mv.index).update_traces(marker=dict(size=10), name='Stocks')
 
     if len(tickers) > 1:
         # Add minimum variance portfolio
         fig.add_scatter(x=[minVar_portfolio['risk']], y=[minVar_portfolio['return']], mode='markers',
-                                 marker=dict(size=10, color='black'), showlegend=False,
+                                 marker=dict(size=10), showlegend=False,
                                  name='Minimum variance portfolio', text='Minimum variance portfolio')
         # Add max Sharpe portfolio
         fig.add_scatter(x=[maxSharpe_portfolio['risk']], y=[maxSharpe_portfolio['return']], mode='markers',
                                  marker=dict(size=10, color='red'), showlegend=False,
-                                 name='Market portfolio', text='Market portfolio')
+                                 name='Max Sharpe portfolio', text='Max Sharpe portfolio')
         # Add efficient frontier
+        for i in range(len(fig['data'])):
+            if fig['data'][i]['name'] == 'Minimum variance portfolio':
+                color = fig['data'][i]['marker']['color']
         fig.add_scatter(x=efficient_frontier['Risk'], y=efficient_frontier['Return'], mode='lines', 
-                                 line=dict(color='black',width=1), name='Minimum variance line', showlegend=False)
+                     line=dict(color=color, width=1), 
+                     name='Minimum variance line', showlegend=False)
         # Add risk-free asset
+        for i in range(len(fig['data'])):
+            if fig['data'][i]['name'] == 'Max Sharpe portfolio':
+                color = fig['data'][i]['marker']['color']
         fig.add_scatter(x=[0], y=[riskFreeRate], mode='markers',
-                                 marker=dict(size=10, color='red'), showlegend=False,
+                                 marker=dict(size=10, color=color), showlegend=False,
                                  name='Risk-free asset', text='Risk-free asset')
         # Add market line
         fig.add_scatter(x=[0, maxSharpe_portfolio['risk']], y=[riskFreeRate, maxSharpe_portfolio['return']],
-                                 mode='lines', line=dict(color='red', width=1), showlegend=False,
+                                 mode='lines', line=dict(color=color, width=1), showlegend=False,
                                  name='Capital market line', text='Capital market line')
         
         fig.update_xaxes(range=[0, 0.5])
@@ -259,12 +270,13 @@ def select_assets(tickers, investment_start_date, window, riskFreeRate):
 )
 def mc_allocation(tickers, riskFreeRate, n_portfolios, investment_start_date, window, includeRiskFree, shortSelling, showShort, n_clicks):
     riskFreeRate = riskFreeRate/100
+    if not tickers:
+        fig = go.Figure()
+        return fig, None, False, None
+    
     if not n_clicks:
         raise PreventUpdate
 
-    if not tickers:
-        # TODO - Return figure with no data
-        raise PreventUpdate
     
     investment_start_date = dt.datetime.strptime(investment_start_date, '%Y-%m-%d')
     # Analyse assets over a window prior to the start date
@@ -302,28 +314,34 @@ def mc_allocation(tickers, riskFreeRate, n_portfolios, investment_start_date, wi
     fig = px.scatter(mc_portfolios, x='Risk', y='Return', color=color, hover_data={**{asset +' weight': ':.2f' for asset in assetList}, **{'Return': ':.2f', 'Risk': ':.2f', 'Sharpe Ratio': ':.2f'}}, opacity=0.5,).update_traces(name='Monte Carlo samples')
     
     # Add the stocks
-    fig.add_scatter(x=stocks_mv['Risk'], y=stocks_mv['Return'], mode='markers', marker=dict(size=7.5,),showlegend=False, name='Assets', text = [f'<b>{index}</b> <br>Standard deviation: {vol:.2f}<br>Expected return: {ret:.2f}' for index, vol, ret in zip(stocks_mv.index, stocks_mv['Risk'], stocks_mv['Return'])],hoverinfo='text')
+    fig.add_scatter(x=stocks_mv['Risk'], y=stocks_mv['Return'], mode='markers', marker=dict(size=7.5,),showlegend=False, name='Stocks', text = [f'<b>{index}</b> <br>Standard deviation: {vol:.2f}<br>Expected return: {ret:.2f}' for index, vol, ret in zip(stocks_mv.index, stocks_mv['Risk'], stocks_mv['Return'])],hoverinfo='text')
     
     # Add minimum variance portfolio
     fig.add_scatter(x=[minVar_portfolio['risk']], y=[minVar_portfolio['return']], mode='markers',
-                            marker=dict(size=10, color='black'), showlegend=False,
+                            marker=dict(size=10,), showlegend=False,
                             name='Minimum variance portfolio', text='Minimum variance portfolio')
     # Add max Sharpe portfolio
     fig.add_scatter(x=[maxSharpe_portfolio['risk']], y=[maxSharpe_portfolio['return']], mode='markers',
                                  marker=dict(size=10, color='red'), showlegend=False,
                                  name='Market portfolio', text='Market portfolio')
     # Add efficient frontier
+    for i in range(len(fig['data'])):
+        if fig['data'][i]['name'] == 'Minimum variance portfolio':
+            color = fig['data'][i]['marker']['color']
     fig.add_scatter(x=efficient_frontier['Risk'], y=efficient_frontier['Return'], mode='lines', 
-                                 line=dict(color='black',width=1), name='Minimum variance line', showlegend=False)
+                                 line=dict(color=color,width=1), name='Minimum variance line', showlegend=False)
 
     if includeRiskFree:
+        for i in range(len(fig['data'])):
+            if fig['data'][i]['name'] == 'Max Sharpe portfolio':
+                color = fig['data'][i]['marker']['color']
         # Add risk-free asset
         fig.add_scatter(x=[0], y=[riskFreeRate], mode='markers',
-                                marker=dict(size=10, color='red'), showlegend=False,
+                                marker=dict(size=10, color=color), showlegend=False,
                                 name='Risk-free asset', text='Risk-free asset')
         # Add market line
         fig.add_scatter(x=[0, maxSharpe_portfolio['risk']], y=[riskFreeRate, maxSharpe_portfolio['return']],
-                                 mode='lines', line=dict(color='red', width=1), showlegend=False,
+                                 mode='lines', line=dict(color=color, width=1), showlegend=False,
                                  name='Capital market line', text='Capital market line')
 
     if len(mc_portfolios) <= 1000:
@@ -390,7 +408,7 @@ def plot_portfolio(tickers, riskFreeRate, window, includeRiskFree, shortSelling,
         if clickData:
             curveNumber = clickData['points'][0]['curveNumber']
             trace_name = figure['data'][curveNumber]['name']
-            if trace_name != 'Assets':
+            if trace_name != 'Stocks':
                 raise PreventUpdate
             index = clickData['points'][0]['pointNumber']
             asset_value = portfolio.basket.stocks[index].evaluate(initial_investment, investment_start_date)
@@ -399,7 +417,7 @@ def plot_portfolio(tickers, riskFreeRate, window, includeRiskFree, shortSelling,
         if hoverData:
             curveNumber = hoverData['points'][0]['curveNumber']
             trace_name = figure['data'][curveNumber]['name']
-            if trace_name != 'Assets':
+            if trace_name != 'Stocks':
                 raise PreventUpdate
             index = hoverData['points'][0]['pointNumber']
             asset_value = portfolio.basket.stocks[index].evaluate(initial_investment, investment_start_date)
@@ -419,7 +437,7 @@ def plot_portfolio(tickers, riskFreeRate, window, includeRiskFree, shortSelling,
             if trace_name == 'Monte Carlo samples':
                 portfolio_value = portfolio.evaluate(index, initial_investment)
                 fig = px.line(portfolio_value)
-            elif trace_name == 'Assets':
+            elif trace_name == 'Stocks':
                 asset_value = portfolio.basket.stocks[index].evaluate(initial_investment, investment_start_date)
                 fig = px.line(asset_value).update_traces(line_color='black')
 
