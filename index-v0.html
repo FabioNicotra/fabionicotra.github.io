@@ -1,210 +1,261 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link href="css/general.css" rel="stylesheet" />
-    <link href="css/style.css" rel="stylesheet" />
-    <link href="css/queries.css" rel="stylesheet" />
-    <script defer src="js/script.js"></script>
-    <title>Fabio Nicotra &dash; Quantitative Analyst</title>
-  </head>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link href="css/general.css" rel="stylesheet" />
+        <link href="css/style.css" rel="stylesheet" />
+        <link href="css/queries.css" rel="stylesheet" />
+        <script defer src="js/script.js"></script>
+        <title>Fabio Nicotra &dash; Quantitative Analyst</title>
+    </head>
 
-  <body>
-    <header></header>
-    <main>
-      <section class="section-banner">
-        <div class="container banner">
-          <div class="banner-text-box">
-            <h1 class="heading-primary name">Fabio Nicotra</h1>
-            <p class="qualification">Quantitative Analyst</p>
-          </div>
+    <body>
+        <header></header>
+        <main>
+            <section class="section-banner">
+                <div class="container banner">
+                    <div class="banner-text-box">
+                        <h1 class="heading-primary name">Fabio Nicotra</h1>
+                        <p class="qualification">Quantitative Analyst</p>
+                    </div>
 
-          <div class="">
-            <a href="#portfolio" class="btn btn--full margin-right-sm"
-              >Projects</a
-            >
-            <a href="#contacts" class="btn btn--outline">Contacts</a>
-          </div>
-        </div>
-      </section>
-      <section id="portfolio" class="section-projects">
-        <div class="container grid">
-          <article class="project-container">
-            <h2 class="heading-secondary">
-              Portfolio selection and performance insight with Dash
-            </h2>
+                    <div class="">
+                        <a
+                            href="#portfolio"
+                            class="btn btn--full margin-right-sm"
+                            >Projects</a
+                        >
+                        <a href="#contacts" class="btn btn--outline"
+                            >Contacts</a
+                        >
+                    </div>
+                </div>
+            </section>
+            <section id="portfolio" class="section-projects">
+                <div class="container grid">
+                    <article class="project-container">
+                        <h2 class="heading-secondary">
+                            Portfolio selection and performance insight with
+                            Dash
+                        </h2>
 
-            <div class="grid grid--project-hero">
-              <div class="btn-container">
-                <a
-                  class="btn-project"
-                  target="_blank"
-                  href="https://colab.research.google.com/github/FabioNicotra/fabionicotra.github.io/blob/main/04_PortfolioSimulation/PortfolioSimulation.ipynb"
-                >
-                  <img class="icon colab-icon" src="google-colab.svg" />
-                </a>
-                <a
-                  class="btn-project"
-                  target="_blank"
-                  href="https://github.com/FabioNicotra/fabionicotra.github.io/blob/main/04_PortfolioSimulation/PortfolioSimulation.ipynb"
-                >
-                  <img class="icon github-icon" src="github-mark.svg" />
-                </a>
-              </div>
-              <p class="project-description">
-                The dashboard allows the user to select a list of stocks from
-                FTSEMIB index and to simulate the performance of a static
-                portfolio constructed with the selected stocks. The user can
-                select the time frame of the analysis and the date when the
-                portfolio is constructed. The dashboard provides insights about
-                the performance of different allocations on historical data.
-              </p>
+                        <div class="grid grid--project-hero">
+                            <div class="btn-container">
+                                <a
+                                    class="btn-project"
+                                    target="_blank"
+                                    href="https://colab.research.google.com/github/FabioNicotra/fabionicotra.github.io/blob/main/04_PortfolioSimulation/PortfolioSimulation.ipynb"
+                                >
+                                    <img
+                                        class="icon colab-icon"
+                                        src="google-colab.svg"
+                                    />
+                                </a>
+                                <a
+                                    class="btn-project"
+                                    target="_blank"
+                                    href="https://github.com/FabioNicotra/fabionicotra.github.io/blob/main/04_PortfolioSimulation/PortfolioSimulation.ipynb"
+                                >
+                                    <img
+                                        class="icon github-icon"
+                                        src="github-mark.svg"
+                                    />
+                                </a>
+                            </div>
+                            <p class="project-description">
+                                The dashboard allows the user to select a list
+                                of stocks from FTSEMIB index and to simulate the
+                                performance of a static portfolio constructed
+                                with the selected stocks. The user can select
+                                the time frame of the analysis and the date when
+                                the portfolio is constructed. The dashboard
+                                provides insights about the performance of
+                                different allocations on historical data.
+                            </p>
 
-              <iframe
-                src="https://portfolio-dash-555d5b8b7bfa.herokuapp.com"
-                allowfullscreen
-              ></iframe>
+                            <iframe
+                                src="https://portfolio-dash-555d5b8b7bfa.herokuapp.com"
+                                allowfullscreen
+                            ></iframe>
+                        </div>
+                    </article>
+
+                    <article class="project-container" id="genetic-algo">
+                        <h2 class="heading-secondary">
+                            A simple genetic algorithm
+                        </h2>
+                        <div class="grid grid--project">
+                            <div class="project-main">
+                                <a
+                                    class="btn-project"
+                                    target="_blank"
+                                    href="https://colab.research.google.com/github/FabioNicotra/fabionicotra.github.io/blob/main/01_GeneticAlgorithm/GeneticAlgorithm.ipynb"
+                                >
+                                    <img
+                                        class="icon colab-icon"
+                                        src="google-colab.svg"
+                                    />
+                                </a>
+                                <a
+                                    class="btn-project"
+                                    target="_blank"
+                                    href="https://github.com/FabioNicotra/FabiosPortfolio/blob/main/01_GeneticAlgorithm/GeneticAlgorithm.ipynb"
+                                >
+                                    <img
+                                        class="icon github-icon"
+                                        src="github-mark.svg"
+                                    />
+                                </a>
+                                <p class="project-description">
+                                    The project was originally assigned during
+                                    the course Data Structures in Python held by
+                                    Politecnico di Torino in cooperation with
+                                    Reply IT. This notebook presents two
+                                    distinct implementations of a genetic
+                                    algorithm. The first implementation utilizes
+                                    simple functions to handle a list of floats,
+                                    where each float represents the fitness of
+                                    an individual. The second implementation
+                                    takes advantage of object-oriented
+                                    programming principles. Here, each
+                                    individual is represented as an object with
+                                    its own attributes. A dedicated class is
+                                    responsible for managing the population,
+                                    utilizing its methods to execute iterations
+                                    of the evolutionary process. By
+                                    encapsulating the individuals within
+                                    objects, this object-oriented approach
+                                    offers improved modularity, reusability, and
+                                    ease of implementation.
+                                </p>
+                            </div>
+
+                            <img
+                                src="img/projects/proj-01.png"
+                                class="project-img"
+                                alt="Fitness over generations"
+                            />
+                        </div>
+                    </article>
+
+                    <article
+                        class="project-container"
+                        id="price-classification"
+                    >
+                        <h2 class="heading-secondary">
+                            Smartphone price classification
+                        </h2>
+                        <div class="grid grid--project">
+                            <div class="project-main">
+                                <a
+                                    class="btn-project"
+                                    target="_blank"
+                                    href="https://colab.research.google.com/github/FabioNicotra/fabionicotra.github.io/blob/main/02_MobileClassification/MobileClassification.ipynb"
+                                >
+                                    <img
+                                        class="icon colab-icon"
+                                        src="google-colab.svg"
+                                    />
+                                </a>
+                                <a
+                                    class="btn-project"
+                                    target="_blank"
+                                    href="https://github.com/FabioNicotra/fabionicotra.github.io/blob/main/02_MobileClassification/MobileClassification.ipynb"
+                                >
+                                    <img
+                                        class="icon github-icon"
+                                        src="github-mark.svg"
+                                    />
+                                </a>
+
+                                <p class="project-description">
+                                    The project was originally assigned during
+                                    the course Data Structures in Python held by
+                                    Politecnico di Torino in cooperation with
+                                    Reply IT. The dataset provided for this
+                                    project contains information about technical
+                                    characteristics of mobile phones as well as
+                                    price ranges. The objective is to analyze
+                                    the device characteristics and explore their
+                                    influence on the device price. Additionally,
+                                    the project involves implementing different
+                                    classification models. These models will be
+                                    used to categorize the devices based on
+                                    their features and predict their price
+                                    ranges. The classification models aim to
+                                    provide insights into how different device
+                                    characteristics contribute to determining
+                                    the price.
+                                </p>
+                            </div>
+                            <img
+                                src="img/projects/proj-02.png"
+                                class="project-img"
+                                alt="Confusion Matrix"
+                            />
+                        </div>
+                    </article>
+                </div>
+            </section>
+            <aside></aside>
+        </main>
+        <footer id="contacts" class="footer">
+            <div class="container grid">
+                <div class="address-col">
+                    <h2 class="footer-heading">Contact me</h2>
+                    <address class="contacts">
+                        <p>
+                            <a
+                                class="footer-link"
+                                href="mailto:nicotra.fabio@icloud.com"
+                                >nicotra.fabio@icloud.com</a
+                            >
+                        </p>
+                    </address>
+                    <div>
+                        <ul class="social-links">
+                            <li>
+                                <a
+                                    class="footer-link"
+                                    href="https://www.linkedin.com/in/fabio-nicotra/"
+                                    target="_blank"
+                                >
+                                    <ion-icon
+                                        class="social-icon"
+                                        name="logo-linkedin"
+                                    ></ion-icon>
+                                </a>
+                            </li>
+                            <li>
+                                <a
+                                    class="footer-link"
+                                    href="https://github.com/FabioNicotra"
+                                    target="_blank"
+                                >
+                                    <ion-icon
+                                        class="social-icon"
+                                        name="logo-github"
+                                    ></ion-icon>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                    <p class="copyright">
+                        Copyright &copy; <span class="year">year</span> by Fabio
+                        Nicotra. All rights reserved.
+                    </p>
+                </div>
             </div>
-          </article>
+        </footer>
 
-          <article class="project-container">
-            <h2 class="heading-secondary">A simple genetic algorithm</h2>
-            <div class="grid grid--project">
-              <div class="project-main">
-                <a
-                  class="btn-project"
-                  target="_blank"
-                  href="https://colab.research.google.com/github/FabioNicotra/fabionicotra.github.io/blob/main/01_GeneticAlgorithm/GeneticAlgorithm.ipynb"
-                >
-                  <img class="icon colab-icon" src="google-colab.svg" />
-                </a>
-                <a
-                  class="btn-project"
-                  target="_blank"
-                  href="https://github.com/FabioNicotra/FabiosPortfolio/blob/main/01_GeneticAlgorithm/GeneticAlgorithm.ipynb"
-                >
-                  <img class="icon github-icon" src="github-mark.svg" />
-                </a>
-                <p class="project-description">
-                  The project was originally assigned during the course Data
-                  Structures in Python held by Politecnico di Torino in
-                  cooperation with Reply IT. This notebook presents two distinct
-                  implementations of a genetic algorithm. The first
-                  implementation utilizes simple functions to handle a list of
-                  floats, where each float represents the fitness of an
-                  individual. The second implementation takes advantage of
-                  object-oriented programming principles. Here, each individual
-                  is represented as an object with its own attributes. A
-                  dedicated class is responsible for managing the population,
-                  utilizing its methods to execute iterations of the
-                  evolutionary process. By encapsulating the individuals within
-                  objects, this object-oriented approach offers improved
-                  modularity, reusability, and ease of implementation.
-                </p>
-              </div>
-
-              <img
-                src="img/projects/proj-01.png"
-                class="project-img"
-                alt="Fitness over generations"
-              />
-            </div>
-          </article>
-
-          <article class="project-container">
-            <h2 class="heading-secondary">Smartphone price classification</h2>
-            <div class="grid grid--project">
-              <div class="project-main">
-                <a
-                  class="btn-project"
-                  target="_blank"
-                  href="https://colab.research.google.com/github/FabioNicotra/fabionicotra.github.io/blob/main/02_MobileClassification/MobileClassification.ipynb"
-                >
-                  <img class="icon colab-icon" src="google-colab.svg" />
-                </a>
-                <a
-                  class="btn-project"
-                  target="_blank"
-                  href="https://github.com/FabioNicotra/fabionicotra.github.io/blob/main/02_MobileClassification/MobileClassification.ipynb"
-                >
-                  <img class="icon github-icon" src="github-mark.svg" />
-                </a>
-
-                <p class="project-description">
-                  The project was originally assigned during the course Data
-                  Structures in Python held by Politecnico di Torino in
-                  cooperation with Reply IT. The dataset provided for this
-                  project contains information about technical characteristics
-                  of mobile phones as well as price ranges. The objective is to
-                  analyze the device characteristics and explore their influence
-                  on the device price. Additionally, the project involves
-                  implementing different classification models. These models
-                  will be used to categorize the devices based on their features
-                  and predict their price ranges. The classification models aim
-                  to provide insights into how different device characteristics
-                  contribute to determining the price.
-                </p>
-              </div>
-              <img
-                src="img/projects/proj-02.png"
-                class="project-img"
-                alt="Confusion Matrix"
-              />
-            </div>
-          </article>
-        </div>
-      </section>
-      <aside></aside>
-    </main>
-    <footer id="contacts" class="footer">
-      <div class="container grid">
-        <div class="address-col">
-          <h2 class="footer-heading">Contact me</h2>
-          <address class="contacts">
-            <p>
-              <a class="footer-link" href="mailto:nicotra.fabio@icloud.com"
-                >nicotra.fabio@icloud.com</a
-              >
-            </p>
-          </address>
-          <div>
-            <ul class="social-links">
-              <li>
-                <a
-                  class="footer-link"
-                  href="https://www.linkedin.com/in/fabio-nicotra/"
-                  target="_blank"
-                >
-                  <ion-icon class="social-icon" name="logo-linkedin"></ion-icon>
-                </a>
-              </li>
-              <li>
-                <a
-                  class="footer-link"
-                  href="https://github.com/FabioNicotra"
-                  target="_blank"
-                >
-                  <ion-icon class="social-icon" name="logo-github"></ion-icon>
-                </a>
-              </li>
-            </ul>
-          </div>
-          <p class="copyright">
-            Copyright &copy; <span class="year">year</span> by Fabio Nicotra.
-            All rights reserved.
-          </p>
-        </div>
-      </div>
-    </footer>
-
-    <script
-      type="module"
-      src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"
-    ></script>
-    <script
-      nomodule
-      src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"
-    ></script>
-  </body>
+        <script
+            type="module"
+            src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"
+        ></script>
+        <script
+            nomodule
+            src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"
+        ></script>
+    </body>
 </html>
