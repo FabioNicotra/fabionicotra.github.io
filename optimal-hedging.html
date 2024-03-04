@@ -55,18 +55,55 @@
                 <!-- Content -->
                 <div class="wrapper">
                     <div class="inner">
-                        <h3 class="major">Lorem ipsum dolor</h3>
+                        <h3 class="major">Volatility arbitrage</h3>
                         <p>
-                            Lorem ipsum dolor sit amet consectetur adipisicing
-                            elit. Rerum officia assumenda ratione pariatur
-                            possimus eum ipsum soluta molestias cumque. Quisquam
-                            beatae quibusdam accusantium doloribus! Quas
-                            repellendus reprehenderit voluptatum doloremque
-                            voluptate.
+                            When the actual volatility exceeds the implied
+                            volatility, implementing delta hedging on a long
+                            option position can guarantee a profit. The expected
+                            value of this profit is dependent on the hedging
+                            approach employed. It is demonstrated that hedging
+                            with the delta derived from actual volatility
+                            results in a deterministic profit, whereas the
+                            profit obtained by hedging with implied volatility
+                            is uncertain and path-dependent. These findings have
+                            been the subject of numerous studies in the
+                            literature, including Ahmad and Wilmott
+                            <sup><a href="#references">[1]</a></sup
+                            >. The results are proven both analytically and
+                            numerically, utilizing Monte Carlo simulations to
+                            model the asset price evolution. Additionally, the
+                            path dependency of the profit when hedging with
+                            implied volatility is broken down in terms of the
+                            Greeks.
                         </p>
 
-                        <h3 class="major"></h3>
-                        <p></p>
+                        <h3 class="major">Minimum Variance Delta</h3>
+                        <p>
+                            Option chains for the S&P500 index are analyzed to
+                            develop a mathematical model for determining the
+                            Minimum Variance Delta that improves hedging
+                            performance by minimizing the variance of hedging
+                            errors. Historical data are employed to estimate the
+                            parameters involved in the mathematical model,
+                            following the approach demonstrated by Hull and
+                            White<sup><a href="#references">[2]</a></sup
+                            >.
+                        </p>
+
+                        <h3 class="major">References</h3>
+                        <ol id="references">
+                            <li>
+                                Riaz Ahmad and Paul Wilmott. Which Free Lunch
+                                Would You Like Today, Sir? Delta Hedging,
+                                Volatility Arbitrage and Optimal Portfolios.
+                                Wilmott Magazine, pages 64–79, 01 2005.
+                            </li>
+                            <li>
+                                John Hull and Alan White. Optimal delta hedging
+                                for options. Journal of Banking & Finance,
+                                82:180–190, 2017.
+                            </li>
+                        </ol>
                     </div>
                 </div>
             </section>
