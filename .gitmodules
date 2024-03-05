@@ -1,0 +1,3 @@
+[submodule "04_PortfolioSimulation/app"]
+	path = 04_PortfolioSimulation/app
+	url = https://github.com/FabioNicotra/portfolio-dash.git
