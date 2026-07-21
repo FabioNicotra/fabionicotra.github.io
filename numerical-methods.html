@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Numerical Methods Library — Fabio Nicotra</title>
+        <link rel="stylesheet" href="css/style.css" />
+    </head>
+    <body>
+        <div class="progress-bar" id="progressBar"></div>
+
+        <div class="blob blob-a"></div>
+        <div class="blob blob-b"></div>
+        <div class="blob blob-c"></div>
+
+        <nav class="topnav">
+            <span class="brand">Fabio Nicotra</span>
+            <div class="topnav-links">
+                <a href="index.html#about">About</a>
+                <a href="index.html#work">Work</a>
+                <a href="index.html#skills">Skills</a>
+                <a href="index.html#contact">Contact</a>
+            </div>
+        </nav>
+
+        <main>
+            <section class="page-hero">
+                <a href="index.html#work" class="section-back">← Work</a>
+                <p class="eyebrow reveal">Numerical Methods</p>
+                <h1 class="reveal">Numerical Methods Library</h1>
+                <p class="hero-sub reveal">
+                    Classical numerical algorithms as reusable modules.
+                </p>
+                <a
+                    href="numerical-methods-demo/yield_curve.html"
+                    class="btn reveal"
+                    >Open demo →</a
+                >
+            </section>
+
+            <section class="content">
+                <div class="prose reveal">
+                    <h2>Overview</h2>
+                    <p>
+                        A Python library implementing numerical algorithms from
+                        <em>Numerical Analysis</em> by Burden and Faires. Each
+                        algorithm is implemented as a reusable module. The
+                        library includes implementations of root-finding,
+                        interpolation, linear systems solvers, and numerical
+                        differentiation and integration methods.
+                    </p>
+                </div>
+
+                <div class="prose reveal">
+                    <h2>Modules</h2>
+                    <div class="work-grid">
+                        <div class="glass-card">
+                            <h3>Root-finding</h3>
+                            <p>
+                                Methods for locating zeros of functions:
+                                bisection, Newton-Raphson, secant method,
+                                fixed-point iteration, and Müller's method.
+                            </p>
+                        </div>
+
+                        <div class="glass-card">
+                            <h3>Interpolation</h3>
+                            <p>
+                                Techniques for fitting curves through data
+                                points: Lagrange interpolation, Newton divided
+                                differences, Hermite interpolation, and cubic
+                                splines.
+                            </p>
+                        </div>
+
+                        <div class="glass-card">
+                            <h3>Linear Systems</h3>
+                            <p>
+                                Solvers for linear systems: Gaussian
+                                elimination, LU and Cholesky factorizations, and
+                                iterative methods like Jacobi and Gauss-Seidel.
+                            </p>
+                        </div>
+
+                        <div class="glass-card">
+                            <h3>Differentiation &amp; Integration</h3>
+                            <p>
+                                Finite difference formulas for derivatives and
+                                Newton-Cotes methods for numerical integration.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="prose reveal">
+                    <h2>Demo</h2>
+                    <p>
+                        The yield curve interpolation demo uses cubic splines to
+                        fit smooth curves through bond yield data. Adjust the
+                        input values to see the interpolation update in real
+                        time.
+                    </p>
+                    <a
+                        href="numerical-methods-demo/yield_curve.html"
+                        class="btn"
+                        >Open demo →</a
+                    >
+                </div>
+            </section>
+
+            <footer class="site-footer">
+                <p>
+                    &copy; <span id="year"></span> Fabio Nicotra. All rights
+                    reserved.
+                </p>
+            </footer>
+        </main>
+
+        <script src="js/main.js"></script>
+    </body>
+</html>
