@@ -309,7 +309,7 @@ section h2 {
 .prose em { color: var(--fg); font-style: italic; }
 .prose .work-grid { max-width: none; margin-top: 0.5rem; }
 
-/* --- Interactive tools (e.g. yield curve demo) --- */
+/* --- Interactive tools (e.g. interpolation demo) --- */
 .tool-grid {
   display: grid;
   grid-template-columns: 1fr 1.6fr;
