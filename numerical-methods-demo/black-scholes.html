@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Black-Scholes PDE Solver — Fabio Nicotra</title>
+        <link rel="stylesheet" href="../css/style.css" />
+        <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/pyodide/v0.26.1/full/pyodide.js"></script>
+    </head>
+    <body>
+        <div class="progress-bar" id="progressBar"></div>
+
+        <div class="blob blob-a"></div>
+        <div class="blob blob-b"></div>
+        <div class="blob blob-c"></div>
+
+        <nav class="topnav">
+            <span class="brand">Fabio Nicotra</span>
+            <div class="topnav-links">
+                <a href="../index.html#about">About</a>
+                <a href="../index.html#work">Work</a>
+                <a href="../index.html#skills">Skills</a>
+                <a href="../index.html#contact">Contact</a>
+            </div>
+        </nav>
+
+        <main>
+            <section class="page-hero">
+                <a href="../numerical-methods.html" class="section-back"
+                    >← Numerical Methods</a
+                >
+                <p class="eyebrow reveal">Interactive Demo</p>
+                <h1 class="reveal">Black-Scholes PDE Solver</h1>
+                <p class="hero-sub reveal">
+                    Solve the Black-Scholes PDE for a European option by
+                    finite differences, and compare the result against the
+                    closed-form analytic price.
+                </p>
+            </section>
+
+            <section class="content">
+                <div id="loading" class="glass-card tool-loading reveal">
+                    <div class="spinner"></div>
+                    <p>Loading…</p>
+                </div>
+
+                <div id="app" class="tool-grid reveal" style="display: none">
+                    <div class="glass-card">
+                        <h2>Parameters</h2>
+                        <table
+                            class="data-table data-table--params"
+                            id="paramsTable"
+                        >
+                            <thead>
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <label for="inp-S">Spot price (S)</label>
+                                    </td>
+                                    <td>
+                                        <input
+                                            type="number"
+                                            id="inp-S"
+                                            value="100"
+                                            min="0"
+                                            step="1"
+                                        />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <label for="inp-K">Strike (K)</label>
+                                    </td>
+                                    <td>
+                                        <input
+                                            type="number"
+                                            id="inp-K"
+                                            value="100"
+                                            min="0.01"
+                                            step="1"
+                                        />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <label for="inp-T"
+                                            >Time to maturity, years (T)</label
+                                        >
+                                    </td>
+                                    <td>
+                                        <input
+                                            type="number"
+                                            id="inp-T"
+                                            value="1"
+                                            min="0.01"
+                                            step="0.05"
+                                        />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <label for="inp-r"
+                                            >Risk-free rate, % (r)</label
+                                        >
+                                    </td>
+                                    <td>
+                                        <input
+                                            type="number"
+                                            id="inp-r"
+                                            value="4"
+                                            min="0"
+                                            step="0.1"
+                                        />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <label for="inp-sigma"
+                                            >Volatility, % (σ)</label
+                                        >
+                                    </td>
+                                    <td>
+                                        <input
+                                            type="number"
+                                            id="inp-sigma"
+                                            value="20"
+                                            min="0.01"
+                                            step="0.5"
+                                        />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <label for="inp-type"
+                                            >Option type</label
+                                        >
+                                    </td>
+                                    <td>
+                                        <select id="inp-type">
+                                            <option value="call" selected
+                                                >Call</option
+                                            >
+                                            <option value="put">Put</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <label for="inp-method">Method</label>
+                                    </td>
+                                    <td>
+                                        <select id="inp-method">
+                                            <option
+                                                value="backward-difference"
+                                                selected
+                                                >Backward-difference</option
+                                            >
+                                            <option value="crank-nicolson"
+                                                >Crank-Nicolson</option
+                                            >
+                                            <option value="forward-difference"
+                                                >Forward-difference</option
+                                            >
+                                        </select>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <label for="inp-m"
+                                            >Spatial steps</label
+                                        >
+                                    </td>
+                                    <td>
+                                        <input
+                                            type="number"
+                                            id="inp-m"
+                                            value="40"
+                                            min="4"
+                                            max="100"
+                                            step="1"
+                                        />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <label for="inp-N"
+                                            >Time steps</label
+                                        >
+                                    </td>
+                                    <td>
+                                        <input
+                                            type="number"
+                                            id="inp-N"
+                                            value="80"
+                                            min="2"
+                                            max="300"
+                                            step="1"
+                                        />
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p>
+                            S_max (the grid's price-axis truncation) is fixed
+                            automatically at 4 × strike.
+                        </p>
+                        <div
+                            id="status"
+                            class="tool-status"
+                            style="display: none"
+                        ></div>
+                    </div>
+
+                    <div class="glass-card chart-card chart-card--tall">
+                        <div id="plot"></div>
+                    </div>
+                </div>
+            </section>
+
+            <footer class="site-footer">
+                <p>
+                    &copy; <span id="year"></span> Fabio Nicotra. All rights
+                    reserved.
+                </p>
+            </footer>
+        </main>
+
+        <script src="../js/main.js"></script>
+        <script>
+            let pyodide;
+
+            function getChartTheme() {
+                const computed = getComputedStyle(document.documentElement);
+                const token = (name) => computed.getPropertyValue(name).trim();
+                return {
+                    font: token("--fg"),
+                    grid: token("--grid"),
+                    marker: token("--accent-2"),
+                    curve: token("--accent-1"),
+                    danger: token("--danger"),
+                };
+            }
+
+            async function initializePyodide() {
+                pyodide = await loadPyodide();
+                await pyodide.loadPackage([
+                    "micropip",
+                    "numpy",
+                    "matplotlib",
+                    "pandas",
+                ]);
+
+                await pyodide.runPythonAsync(`
+            import micropip
+            await micropip.install('numanlib')
+        `);
+
+                await pyodide.runPythonAsync(`
+            import numpy as np
+            import math
+            import json
+            from numanlib.pdes import SpatiotemporalDomain1D, ParabolicBCs, BlackScholesEquationSolver
+
+            def _ncdf(x):
+                return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
+
+            def _closed_form_price(S, K, tau, r, sigma, is_call):
+                if tau <= 1e-12:
+                    return max(S - K, 0.0) if is_call else max(K - S, 0.0)
+                if S <= 0:
+                    return 0.0 if is_call else K * math.exp(-r * tau)
+                d1 = (math.log(S / K) + (r + 0.5 * sigma * sigma) * tau) / (sigma * math.sqrt(tau))
+                d2 = d1 - sigma * math.sqrt(tau)
+                if is_call:
+                    return S * _ncdf(d1) - K * math.exp(-r * tau) * _ncdf(d2)
+                return K * math.exp(-r * tau) * _ncdf(-d2) - S * _ncdf(-d1)
+
+            def solve_black_scholes(S, K, T, r, sigma, option_type, m, N, method):
+                try:
+                    S, K, T, r, sigma = float(S), float(K), float(T), float(r), float(sigma)
+                    m, N = int(m), int(N)
+                    is_call = (option_type == "call")
+                    S_max = 4.0 * K
+                    domain = SpatiotemporalDomain1D(l=S_max, T=T)
+
+                    if is_call:
+                        terminal = lambda s: max(s - K, 0.0)
+                        g0 = lambda t: 0.0
+                        g1 = lambda t: S_max - K * math.exp(-r * (T - t))
+                    else:
+                        terminal = lambda s: max(K - s, 0.0)
+                        g0 = lambda t: K * math.exp(-r * (T - t))
+                        g1 = lambda t: 0.0
+
+                    solver = BlackScholesEquationSolver(
+                        domain=domain, r=r, sigma=sigma, terminal_condition=terminal,
+                        boundary_conditions=ParabolicBCs(g0=g0, g1=g1), m=m, N=N, method=method,
+                    )
+                    result = solver.solve()
+                    if not result.solved:
+                        return {"success": False, "error": result.error_msg}
+
+                    grid_S = result.grid_x
+                    grid_t_full = result.grid_t
+                    payoff_curve = [terminal(float(s)) for s in grid_S]
+                    spot_in_domain = 0.0 <= S <= S_max
+
+                    # Subsample time steps for the slider: keep the UI usable and the
+                    # payload small even when N is large; the solve itself still ran
+                    # at the full N resolution, this only thins which columns we ship.
+                    max_frames = 50
+                    n_t = len(grid_t_full)
+                    if n_t <= max_frames:
+                        idx = list(range(n_t))
+                    else:
+                        idx = sorted(set(round(i * (n_t - 1) / (max_frames - 1)) for i in range(max_frames)))
+
+                    grid_t = [float(grid_t_full[j]) for j in idx]
+                    fd_grid = [result.solution[:, j].tolist() for j in idx]
+                    closed_form_grid = [
+                        [_closed_form_price(float(s), K, T - grid_t_full[j], r, sigma, is_call) for s in grid_S]
+                        for j in idx
+                    ]
+
+                    return {
+                        "success": True,
+                        "grid_S": grid_S.tolist(),
+                        "grid_t": grid_t,
+                        "payoff_curve": payoff_curve,
+                        "fd_grid": fd_grid,
+                        "closed_form_grid": closed_form_grid,
+                        "S_max": S_max,
+                        "spot_in_domain": spot_in_domain,
+                        "spot_fd_price": float(np.interp(S, grid_S, fd_grid[0])) if spot_in_domain else None,
+                        "spot_closed_form_price": _closed_form_price(S, K, T, r, sigma, is_call) if spot_in_domain else None,
+                    }
+                except Exception as e:
+                    return {"success": False, "error": str(e)}
+        `);
+
+                document.getElementById("loading").style.display = "none";
+                document.getElementById("app").style.display = "grid";
+
+                const inputs = [
+                    "inp-S",
+                    "inp-K",
+                    "inp-T",
+                    "inp-r",
+                    "inp-sigma",
+                    "inp-type",
+                    "inp-method",
+                    "inp-m",
+                    "inp-N",
+                ];
+                inputs.forEach((id) => {
+                    document
+                        .getElementById(id)
+                        .addEventListener("change", updatePlot);
+                });
+
+                await updatePlot();
+
+                window
+                    .matchMedia("(prefers-color-scheme: dark)")
+                    .addEventListener("change", () => {
+                        updatePlot();
+                    });
+            }
+
+            function readInputs() {
+                return {
+                    S: parseFloat(document.getElementById("inp-S").value),
+                    K: parseFloat(document.getElementById("inp-K").value),
+                    T: parseFloat(document.getElementById("inp-T").value),
+                    r: parseFloat(document.getElementById("inp-r").value) / 100,
+                    sigma:
+                        parseFloat(
+                            document.getElementById("inp-sigma").value,
+                        ) / 100,
+                    optionType: document.getElementById("inp-type").value,
+                    method: document.getElementById("inp-method").value,
+                    m: parseInt(document.getElementById("inp-m").value, 10),
+                    N: parseInt(document.getElementById("inp-N").value, 10),
+                };
+            }
+
+            function validateInputs(v) {
+                if (
+                    [v.S, v.K, v.T, v.r, v.sigma].some(Number.isNaN) ||
+                    Number.isNaN(v.m) ||
+                    Number.isNaN(v.N)
+                ) {
+                    return {
+                        valid: false,
+                        error: "All fields must be valid numbers.",
+                    };
+                }
+                if (v.K <= 0)
+                    return { valid: false, error: "Strike must be positive." };
+                if (v.S < 0)
+                    return {
+                        valid: false,
+                        error: "Spot price cannot be negative.",
+                    };
+                if (v.T <= 0)
+                    return {
+                        valid: false,
+                        error: "Time to maturity must be positive.",
+                    };
+                if (v.sigma <= 0)
+                    return {
+                        valid: false,
+                        error: "Volatility must be positive.",
+                    };
+                if (v.r < 0)
+                    return {
+                        valid: false,
+                        error: "This solver requires a non-negative risk-free rate.",
+                    };
+                if (!Number.isInteger(v.m) || v.m < 4)
+                    return {
+                        valid: false,
+                        error: "Spatial steps (m) must be an integer ≥ 4.",
+                    };
+                if (!Number.isInteger(v.N) || v.N < 2)
+                    return {
+                        valid: false,
+                        error: "Time steps (N) must be an integer ≥ 2.",
+                    };
+                const sMax = 4 * v.K;
+                if (v.S > sMax) {
+                    return {
+                        valid: false,
+                        error: `Spot price must stay below S_max = 4 × strike = ${sMax.toFixed(2)}.`,
+                    };
+                }
+                return { valid: true };
+            }
+
+            async function updatePlot() {
+                if (!pyodide) return;
+
+                const statusEl = document.getElementById("status");
+                const v = readInputs();
+                const check = validateInputs(v);
+
+                if (!check.valid) {
+                    statusEl.textContent = check.error;
+                    statusEl.classList.add("error");
+                    statusEl.style.display = "block";
+                    return;
+                }
+
+                const resultJson = await pyodide.runPythonAsync(`
+            import json
+            json.dumps(solve_black_scholes(${JSON.stringify(v.S)}, ${JSON.stringify(v.K)}, ${JSON.stringify(v.T)}, ${JSON.stringify(v.r)}, ${JSON.stringify(v.sigma)}, ${JSON.stringify(v.optionType)}, ${JSON.stringify(v.m)}, ${JSON.stringify(v.N)}, ${JSON.stringify(v.method)}))
+        `);
+
+                const data = JSON.parse(resultJson);
+
+                if (!data.success) {
+                    statusEl.textContent = data.error;
+                    statusEl.classList.add("error");
+                    statusEl.style.display = "block";
+                    return;
+                }
+
+                if (data.spot_in_domain) {
+                    const diff = Math.abs(
+                        data.spot_fd_price - data.spot_closed_form_price,
+                    );
+                    statusEl.textContent = `At S=${v.S}: ${v.method} = ${data.spot_fd_price.toFixed(4)}, closed-form = ${data.spot_closed_form_price.toFixed(4)} (abs. diff ${diff.toFixed(4)})`;
+                } else {
+                    statusEl.textContent = `Curve computed on S ∈ [0, ${data.S_max.toFixed(2)}]; spot ${v.S} is outside this range.`;
+                }
+                statusEl.classList.remove("error");
+                statusEl.style.display = "block";
+
+                renderChart(v, data);
+            }
+
+            function renderChart(v, data) {
+                const theme = getChartTheme();
+
+                // Grid solve always spans [0, 4K] (needed for the boundary
+                // conditions to hold), but that's rarely the interesting
+                // range to look at — clip the displayed window to something
+                // realistic, while still guaranteeing the spot price is visible.
+                const displayMax = Math.min(
+                    data.S_max,
+                    Math.max(2 * v.K, v.S * 1.15),
+                );
+                let sliceEnd = data.grid_S.findIndex((s) => s > displayMax);
+                if (sliceEnd === -1) sliceEnd = data.grid_S.length;
+
+                const S = data.grid_S.slice(0, sliceEnd);
+                const payoff = data.payoff_curve.slice(0, sliceEnd);
+                const fdFrames = data.fd_grid.map((row) =>
+                    row.slice(0, sliceEnd),
+                );
+                const cfFrames = data.closed_form_grid.map((row) =>
+                    row.slice(0, sliceEnd),
+                );
+
+                const payoffTrace = {
+                    x: S,
+                    y: payoff,
+                    mode: "lines",
+                    name: "Payoff at expiry",
+                    line: { color: theme.danger, width: 1.25, dash: "solid" },
+                    hovertemplate: "S = %{x:.2f}<br>payoff = %{y:.4f}<extra></extra>",
+                };
+                const cfTrace = {
+                    x: S,
+                    y: cfFrames[0],
+                    mode: "lines",
+                    name: "Closed-form (Black-Scholes)",
+                    line: { color: theme.curve, width: 2, dash: "dot" },
+                    hovertemplate: "S = %{x:.2f}<br>V = %{y:.4f}<extra></extra>",
+                };
+                const fdTrace = {
+                    x: S,
+                    y: fdFrames[0],
+                    mode: "lines",
+                    name: `Finite difference (${v.method})`,
+                    line: { color: theme.marker, width: 3 },
+                    hovertemplate: "S = %{x:.2f}<br>V = %{y:.4f}<extra></extra>",
+                };
+
+                const shapes = data.spot_in_domain
+                    ? [
+                          {
+                              type: "line",
+                              xref: "x",
+                              yref: "paper",
+                              x0: v.S,
+                              x1: v.S,
+                              y0: 0,
+                              y1: 1,
+                              line: {
+                                  color: theme.font,
+                                  width: 1,
+                                  dash: "dot",
+                              },
+                          },
+                      ]
+                    : [];
+
+                // Payoff (trace 0) never changes with time, so frames only
+                // update the closed-form (1) and finite-difference (2) curves
+                // as the slider scrubs from today (t=0) to expiry (t=T).
+                const frames = data.grid_t.map((t, k) => ({
+                    name: `t${k}`,
+                    data: [{ y: cfFrames[k] }, { y: fdFrames[k] }],
+                    traces: [1, 2],
+                }));
+
+                const steps = data.grid_t.map((t, k) => ({
+                    label: t.toFixed(2),
+                    method: "animate",
+                    args: [
+                        [`t${k}`],
+                        {
+                            mode: "immediate",
+                            transition: { duration: 0 },
+                            frame: { duration: 0, redraw: true },
+                        },
+                    ],
+                }));
+
+                const layout = {
+                    title: {
+                        text: "Option Value vs. Spot Price",
+                        font: { color: theme.font },
+                    },
+                    xaxis: {
+                        title: "Spot price S",
+                        range: [0, displayMax],
+                        autorange: false,
+                        gridcolor: theme.grid,
+                        color: theme.font,
+                        zerolinecolor: theme.grid,
+                    },
+                    yaxis: {
+                        title: "Option value",
+                        gridcolor: theme.grid,
+                        color: theme.font,
+                        zerolinecolor: theme.grid,
+                    },
+                    shapes: shapes,
+                    hovermode: "closest",
+                    plot_bgcolor: "transparent",
+                    paper_bgcolor: "transparent",
+                    font: { color: theme.font },
+                    legend: {
+                        font: { color: theme.font },
+                        orientation: "h",
+                        x: 0.5,
+                        xanchor: "center",
+                        y: -0.15,
+                    },
+                    sliders: [
+                        {
+                            active: 0,
+                            x: 0.1,
+                            len: 0.85,
+                            y: -0.35,
+                            pad: { t: 10 },
+                            currentvalue: {
+                                prefix: "t = ",
+                                suffix: " yr",
+                                font: { color: theme.font },
+                            },
+                            font: { color: theme.font },
+                            bgcolor: theme.grid,
+                            bordercolor: theme.grid,
+                            activebgcolor: theme.marker,
+                            steps: steps,
+                        },
+                    ],
+                    margin: { l: 60, r: 30, t: 50, b: 150 },
+                };
+
+                Plotly.newPlot(
+                    "plot",
+                    [payoffTrace, cfTrace, fdTrace],
+                    layout,
+                    { responsive: true },
+                ).then((gd) => {
+                    Plotly.addFrames(gd, frames);
+                });
+            }
+
+            initializePyodide().catch((err) => {
+                document.getElementById("loading").innerHTML =
+                    `<p style="color: var(--danger);">Error: ${err.message}</p>`;
+            });
+        </script>
+    </body>
+</html>
