@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Yield Curve Interpolation — Fabio Nicotra</title>
+        <title>Cubic Spline Interpolation — Fabio Nicotra</title>
         <link rel="stylesheet" href="../css/style.css" />
         <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
         <script src="https://cdn.jsdelivr.net/pyodide/v0.26.1/full/pyodide.js"></script>
@@ -31,10 +31,10 @@
                     >← Numerical Methods</a
                 >
                 <p class="eyebrow reveal">Interactive Demo</p>
-                <h1 class="reveal">Yield Curve Interpolation</h1>
+                <h1 class="reveal">Cubic Spline Interpolation</h1>
                 <p class="hero-sub reveal">
-                    Enter bond yields at different maturities, fit a smooth
-                    curve via cubic splines.
+                    Enter a set of data points, fit a smooth curve through
+                    them via cubic splines.
                 </p>
             </section>
 
@@ -46,12 +46,12 @@
 
                 <div id="app" class="tool-grid reveal" style="display: none">
                     <div class="glass-card">
-                        <h2>Market Data</h2>
+                        <h2>Data Points</h2>
                         <table class="data-table" id="dataTable">
                             <thead>
                                 <tr>
-                                    <th>Maturity (yrs)</th>
-                                    <th>Yield (%)</th>
+                                    <th>X</th>
+                                    <th>Y</th>
                                     <th></th>
                                 </tr>
                             </thead>
@@ -91,12 +91,12 @@
         <script>
             let pyodide;
             const defaultData = [
-                { maturity: 0.25, yield: 4.5 },
-                { maturity: 0.5, yield: 4.6 },
-                { maturity: 1, yield: 4.7 },
-                { maturity: 2, yield: 4.85 },
-                { maturity: 5, yield: 5.0 },
-                { maturity: 10, yield: 5.1 },
+                { x: 0, y: 1 },
+                { x: 1, y: 2.5 },
+                { x: 2, y: 2 },
+                { x: 4, y: 3.5 },
+                { x: 6, y: 3 },
+                { x: 10, y: 4.5 },
             ];
 
             function getChartTheme() {
@@ -107,7 +107,6 @@
                     grid: token("--grid"),
                     marker: token("--accent-2"),
                     curve: token("--accent-1"),
-                    extrapolation: token("--warning"),
                 };
             }
 
@@ -132,19 +131,19 @@
 
             current_spline = None
 
-            def fit_spline(maturities, yields):
+            def fit_spline(x_values, y_values):
                 global current_spline
                 try:
-                    x = np.array(maturities, dtype=np.float64)
-                    y = np.array(yields, dtype=np.float64)
+                    x = np.array(x_values, dtype=np.float64)
+                    y = np.array(y_values, dtype=np.float64)
 
                     if len(x) < 3:
                         return {'success': False, 'error': 'Need at least 3 points for cubic spline'}
 
                     if len(np.unique(x)) != len(x):
-                        return {'success': False, 'error': 'Maturities must be distinct'}
+                        return {'success': False, 'error': 'X values must be distinct'}
 
-                    # Sort by maturity
+                    # Sort by x
                     sort_idx = np.argsort(x)
                     x = x[sort_idx]
                     y = y[sort_idx]
@@ -153,8 +152,8 @@
                     current_spline = spline.interpolate()
                     return {
                         'success': True,
-                        'min_maturity': float(x.min()),
-                        'max_maturity': float(x.max())
+                        'min_x': float(x.min()),
+                        'max_x': float(x.max())
                     }
                 except Exception as e:
                     return {'success': False, 'error': str(e)}
@@ -163,17 +162,18 @@
                 if current_spline is None:
                     return {'error': 'No spline fitted'}
 
-                min_mat = current_spline.x.min()
-                max_mat = current_spline.x.max()
-                dense_maturities = np.arange(min_mat, max_mat + 0.05, 0.05)
-                interpolated_yields = current_spline(dense_maturities)
+                min_x = current_spline.x.min()
+                max_x = current_spline.x.max()
+                span = max_x - min_x
+                dense_x = np.linspace(min_x, max_x, 400) if span > 0 else np.array([min_x])
+                interpolated_y = current_spline(dense_x)
 
                 return {
                     'success': True,
-                    'dense_maturities': dense_maturities.tolist(),
-                    'interpolated_yields': interpolated_yields.tolist(),
-                    'min_maturity': float(min_mat),
-                    'max_maturity': float(max_mat)
+                    'dense_x': dense_x.tolist(),
+                    'interpolated_y': interpolated_y.tolist(),
+                    'min_x': float(min_x),
+                    'max_x': float(max_x)
                 }
 
         `);
@@ -195,32 +195,32 @@
                 const body = document.getElementById("tableBody");
                 body.innerHTML = "";
                 defaultData.forEach((row) => {
-                    addRowToTable(row.maturity, row.yield);
+                    addRowToTable(row.x, row.y);
                 });
             }
 
-            function addRowToTable(maturity, yieldVal) {
+            function addRowToTable(x, y) {
                 const body = document.getElementById("tableBody");
                 const row = document.createElement("tr");
                 row.innerHTML = `
-            <td><input type="number" class="maturity-input" value="${maturity}" step="0.01" min="0.01"></td>
-            <td><input type="number" class="yield-input" value="${yieldVal}" step="0.01"></td>
+            <td><input type="number" class="x-input" value="${x}" step="0.01"></td>
+            <td><input type="number" class="y-input" value="${y}" step="0.01"></td>
             <td><button class="btn btn-small btn-danger" type="button" onclick="this.closest('tr').remove(); updatePlot()">Delete</button></td>
         `;
                 body.appendChild(row);
 
-                row.querySelector(".maturity-input").addEventListener(
+                row.querySelector(".x-input").addEventListener(
                     "change",
                     updatePlot,
                 );
-                row.querySelector(".yield-input").addEventListener(
+                row.querySelector(".y-input").addEventListener(
                     "change",
                     updatePlot,
                 );
             }
 
             function addRow() {
-                addRowToTable(0.5, 5.0);
+                addRowToTable(5, 3);
                 updatePlot();
             }
 
@@ -228,25 +228,25 @@
                 if (!pyodide) return;
 
                 const rows = document.querySelectorAll("#tableBody tr");
-                const maturities = [];
-                const yields = [];
+                const xValues = [];
+                const yValues = [];
 
                 rows.forEach((row) => {
-                    const m = parseFloat(
-                        row.querySelector(".maturity-input").value,
+                    const x = parseFloat(
+                        row.querySelector(".x-input").value,
                     );
                     const y = parseFloat(
-                        row.querySelector(".yield-input").value,
+                        row.querySelector(".y-input").value,
                     );
-                    if (!isNaN(m) && !isNaN(y)) {
-                        maturities.push(m);
-                        yields.push(y);
+                    if (!isNaN(x) && !isNaN(y)) {
+                        xValues.push(x);
+                        yValues.push(y);
                     }
                 });
 
                 const statusEl = document.getElementById("status");
 
-                if (maturities.length < 3) {
+                if (xValues.length < 3) {
                     statusEl.textContent =
                         "Need at least 3 data points for cubic spline";
                     statusEl.classList.add("error");
@@ -256,7 +256,7 @@
 
                 const fitResult = await pyodide.runPythonAsync(`
             import json
-            json.dumps(fit_spline(${JSON.stringify(maturities)}, ${JSON.stringify(yields)}))
+            json.dumps(fit_spline(${JSON.stringify(xValues)}, ${JSON.stringify(yValues)}))
         `);
 
                 const fit = JSON.parse(fitResult);
@@ -268,7 +268,7 @@
                     return;
                 }
 
-                statusEl.textContent = `Fitted on ${maturities.length} points`;
+                statusEl.textContent = `Fitted on ${xValues.length} points`;
                 statusEl.classList.remove("error");
                 statusEl.style.display = "block";
 
@@ -281,79 +281,41 @@
                 const theme = getChartTheme();
 
                 const dataTrace = {
-                    x: maturities,
-                    y: yields,
+                    x: xValues,
+                    y: yValues,
                     mode: "markers",
                     name: "Input Data",
                     marker: { size: 9, color: theme.marker },
                     hovertemplate:
-                        "<b>%{x:.2f} years</b><br>Yield: %{y:.2f}%<extra></extra>",
+                        "<b>x = %{x:.2f}</b><br>y = %{y:.2f}<extra></extra>",
                 };
 
-                const safeIndices = curve.dense_maturities
-                    .map((t, i) =>
-                        t >= curve.min_maturity && t <= curve.max_maturity
-                            ? i
-                            : null,
-                    )
-                    .filter((i) => i !== null);
-
                 const curveTrace = {
-                    x: safeIndices.map((i) => curve.dense_maturities[i]),
-                    y: safeIndices.map((i) => curve.interpolated_yields[i]),
+                    x: curve.dense_x,
+                    y: curve.interpolated_y,
                     mode: "lines",
                     name: "Cubic Spline",
                     line: { color: theme.curve, width: 3 },
                     hovertemplate:
-                        "<b>%{x:.2f} years</b><br>Yield: %{y:.2f}%<extra></extra>",
+                        "<b>x = %{x:.2f}</b><br>y = %{y:.2f}<extra></extra>",
                 };
-
-                const extrapolIndices = curve.dense_maturities
-                    .map((t, i) =>
-                        t < curve.min_maturity || t > curve.max_maturity
-                            ? i
-                            : null,
-                    )
-                    .filter((i) => i !== null);
-
-                let traces = [dataTrace, curveTrace];
-
-                if (extrapolIndices.length > 0) {
-                    traces.push({
-                        x: extrapolIndices.map(
-                            (i) => curve.dense_maturities[i],
-                        ),
-                        y: extrapolIndices.map(
-                            (i) => curve.interpolated_yields[i],
-                        ),
-                        mode: "lines",
-                        name: "Extrapolation",
-                        line: {
-                            color: theme.extrapolation,
-                            width: 3,
-                            dash: "dash",
-                        },
-                        hovertemplate:
-                            "<b>%{x:.2f} years</b><br>Yield: %{y:.2f}% (extrapolated)<extra></extra>",
-                    });
-                }
 
                 Plotly.newPlot(
                     "plot",
-                    traces,
+                    [dataTrace, curveTrace],
                     {
                         title: {
-                            text: "Yield Curve",
+                            text: "Interpolated Curve",
                             font: { color: theme.font },
                         },
                         xaxis: {
-                            title: "Maturity (years)",
+                            title: "X",
                             gridcolor: theme.grid,
                             color: theme.font,
                             zerolinecolor: theme.grid,
                         },
                         yaxis: {
-                            title: "Yield (%)",
+                            title: "Y",
                             gridcolor: theme.grid,
                             color: theme.font,
                             zerolinecolor: theme.grid,
