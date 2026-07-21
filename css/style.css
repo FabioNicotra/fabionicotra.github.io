@@ -308,6 +308,10 @@ section h2 {
 .prose p:last-child { margin-bottom: 0; }
 .prose em { color: var(--fg); font-style: italic; }
 .prose .work-grid { max-width: none; margin-top: 0.5rem; }
+.prose ul { color: var(--muted); line-height: 1.65; margin: 0; padding-left: 1.25rem; }
+.prose li { margin-bottom: 0.6rem; }
+.prose li:last-child { margin-bottom: 0; }
+.prose li strong { color: var(--fg); }
 
 /* --- Interactive tools (e.g. interpolation demo) --- */
 .tool-grid {
@@ -356,8 +360,9 @@ section h2 {
 }
 .data-table tr:hover td { background: color-mix(in srgb, var(--accent-2) 6%, transparent); }
 .data-table td:last-child { text-align: center; width: 3.5rem; }
+.data-table--params td:last-child { text-align: left; width: auto; }
 
-.data-table input[type="number"] {
+.data-table input[type="number"], .data-table select {
   width: 100%;
   background: transparent;
   color: var(--fg);
@@ -369,11 +374,12 @@ section h2 {
   font-size: 0.92rem;
   transition: border-color 0.2s ease, color 0.35s ease;
 }
-.data-table input[type="number"]:focus {
+.data-table input[type="number"]:focus, .data-table select:focus {
   outline: none;
   border-bottom-color: var(--accent-2);
 }
-.data-table input[type="number"]:hover { border-bottom-color: var(--accent-3); }
+.data-table input[type="number"]:hover, .data-table select:hover { border-bottom-color: var(--accent-3); }
+.data-table select { color-scheme: light dark; }
 
 .tool-add-row { margin-top: 1rem; }
 
@@ -394,3 +400,4 @@ section h2 {
 
 .chart-card { padding: 1.25rem; }
 #plot { width: 100%; height: 460px; }
+.chart-card--tall #plot { height: 560px; }

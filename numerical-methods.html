@@ -31,11 +31,6 @@
                 <p class="hero-sub reveal">
                     Classical numerical algorithms as reusable modules.
                 </p>
-                <a
-                    href="numerical-methods-demo/interpolation.html"
-                    class="btn reveal"
-                    >Open demo →</a
-                >
             </section>
 
             <section class="content">
@@ -46,65 +41,83 @@
                         <em>Numerical Analysis</em> by Burden and Faires. Each
                         algorithm is implemented as a reusable module. The
                         library includes implementations of root-finding,
-                        interpolation, linear systems solvers, and numerical
-                        differentiation and integration methods.
+                        interpolation, linear systems solvers, numerical
+                        differentiation and integration methods, and solvers
+                        for partial differential equations.
                     </p>
                 </div>
 
                 <div class="prose reveal">
                     <h2>Modules</h2>
-                    <div class="work-grid">
-                        <div class="glass-card">
-                            <h3>Root-finding</h3>
-                            <p>
-                                Methods for locating zeros of functions:
-                                bisection, Newton-Raphson, secant method,
-                                fixed-point iteration, and Müller's method.
-                            </p>
-                        </div>
-
-                        <div class="glass-card">
-                            <h3>Interpolation</h3>
-                            <p>
-                                Techniques for fitting curves through data
-                                points: Lagrange interpolation, Newton divided
-                                differences, Hermite interpolation, and cubic
-                                splines.
-                            </p>
-                        </div>
-
-                        <div class="glass-card">
-                            <h3>Linear Systems</h3>
-                            <p>
-                                Solvers for linear systems: Gaussian
-                                elimination, LU and Cholesky factorizations, and
-                                iterative methods like Jacobi and Gauss-Seidel.
-                            </p>
-                        </div>
-
-                        <div class="glass-card">
-                            <h3>Differentiation &amp; Integration</h3>
-                            <p>
-                                Finite difference formulas for derivatives and
-                                Newton-Cotes methods for numerical integration.
-                            </p>
-                        </div>
-                    </div>
+                    <ul>
+                        <li>
+                            <strong>Root-finding</strong> — Methods for
+                            locating zeros of functions: bisection,
+                            Newton-Raphson, secant method, fixed-point
+                            iteration, and Müller's method.
+                        </li>
+                        <li>
+                            <strong>Interpolation</strong> — Techniques for
+                            fitting curves through data points: Lagrange
+                            interpolation, Newton divided differences,
+                            Hermite interpolation, and cubic splines.
+                        </li>
+                        <li>
+                            <strong>Linear Systems</strong> — Solvers for
+                            linear systems: Gaussian elimination, LU and
+                            Cholesky factorizations, and iterative methods
+                            like Jacobi and Gauss-Seidel.
+                        </li>
+                        <li>
+                            <strong>Differentiation &amp; Integration</strong>
+                            — Finite difference formulas for derivatives and
+                            Newton-Cotes methods for numerical integration.
+                        </li>
+                        <li>
+                            <strong>Partial Differential Equations</strong> —
+                            Finite-difference solvers for PDEs: Poisson's
+                            equation, the heat equation via
+                            forward-difference, backward-difference, and
+                            Crank-Nicolson schemes, and a Black-Scholes
+                            options pricer.
+                        </li>
+                    </ul>
                 </div>
 
                 <div class="prose reveal">
-                    <h2>Demo</h2>
-                    <p>
-                        The interpolation demo uses cubic splines to fit a
-                        smooth curve through a set of data points. Adjust the
-                        input values to see the interpolation update in real
-                        time.
-                    </p>
-                    <a
-                        href="numerical-methods-demo/interpolation.html"
-                        class="btn"
-                        >Open demo →</a
-                    >
+                    <h2>Demos</h2>
+                    <div class="work-grid">
+                        <div class="glass-card">
+                            <h3>Cubic Spline Interpolation</h3>
+                            <p>
+                                Fit a smooth curve through a set of data
+                                points using cubic splines. Adjust the input
+                                values to see the interpolation update in
+                                real time.
+                            </p>
+                            <a
+                                href="numerical-methods-demo/interpolation.html"
+                                class="card-link"
+                                >Open demo →</a
+                            >
+                        </div>
+
+                        <div class="glass-card">
+                            <h3>Black-Scholes PDE Solver</h3>
+                            <p>
+                                Solve the option-pricing PDE by finite
+                                differences and overlay the result against
+                                the closed-form analytic price, so the
+                                numerical solution can be checked against
+                                the known answer.
+                            </p>
+                            <a
+                                href="numerical-methods-demo/black-scholes.html"
+                                class="card-link"
+                                >Open demo →</a
+                            >
+                        </div>
+                    </div>
                 </div>
             </section>
 
