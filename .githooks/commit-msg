@@ -1,0 +1,18 @@
+#!/bin/sh
+# Enforces: single short line, no Co-Authored-By trailer.
+
+msg_file="$1"
+content=$(grep -v '^#' "$msg_file")
+
+if printf '%s' "$content" | grep -qi 'co-authored-by'; then
+  echo "✗ Commit messages must not include a Co-Authored-By trailer." >&2
+  exit 1
+fi
+
+lines=$(printf '%s\n' "$content" | grep -c '[^[:space:]]')
+if [ "$lines" -gt 1 ]; then
+  echo "✗ Commit messages must be a single short line — no body." >&2
+  exit 1
+fi
+
+exit 0

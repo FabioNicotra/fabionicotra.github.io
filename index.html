@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Fabio Nicotra — Quantitative Analyst &amp; Developer</title>
+        <link rel="stylesheet" href="css/style.css" />
+    </head>
+    <body>
+        <div class="progress-bar" id="progressBar"></div>
+
+        <div class="blob blob-a"></div>
+        <div class="blob blob-b"></div>
+        <div class="blob blob-c"></div>
+
+        <nav class="topnav">
+            <span class="brand">Fabio Nicotra</span>
+            <div class="topnav-links">
+                <a href="#about" hidden>About</a>
+                <a href="#work">Work</a>
+                <a href="#skills" hidden>Skills</a>
+                <a href="#contact">Contact</a>
+            </div>
+        </nav>
+
+        <main>
+            <section class="hero">
+                <div class="hero-identity">
+                    <h1>Fabio Nicotra</h1>
+                    <p class="eyebrow">Quantitative Analyst &amp; Developer</p>
+                </div>
+                <a href="#work" class="btn">See the work</a>
+            </section>
+
+            <section id="about" class="about" hidden>
+                <h2 class="reveal">About</h2>
+                <div class="glass-card reveal">
+                    <p>
+                        CQF-trained, working across derivatives pricing,
+                        portfolio construction, and numerical methods — usually
+                        by rebuilding the classical method from scratch before
+                        trusting it, then shipping something that holds up on
+                        real market data.
+                    </p>
+                </div>
+            </section>
+
+            <section id="work" class="work">
+                <h2 class="reveal">Selected work</h2>
+                <div class="work-grid">
+                    <article class="glass-card tilt-card reveal">
+                        <span class="tag">Numerical Methods</span>
+                        <h3>Numerical Methods Library</h3>
+                        <p>
+                            Working through Burden &amp; Faires'
+                            <em>Numerical Analysis</em>, implementing
+                            root-finding, interpolation, linear system solvers,
+                            and integration methods as a reusable Python
+                            library.
+                        </p>
+                        <a href="numerical-methods.html" class="card-link"
+                            >View project →</a
+                        >
+                    </article>
+
+                    <article class="glass-card tilt-card reveal">
+                        <span class="tag">Derivatives · CQF</span>
+                        <h3>Optimal Hedging with Advanced Delta Modelling</h3>
+                        <p>
+                            CQF final project on delta hedging under volatility
+                            mispricing, validated via Monte Carlo simulation and
+                            replicated against Hull &amp; White's Minimum
+                            Variance Delta model on a 15M-row S&amp;P 500
+                            options dataset.
+                        </p>
+                    </article>
+
+                    <article class="glass-card tilt-card reveal">
+                        <span class="tag">Portfolio Theory</span>
+                        <h3>Portfolio Management Dashboard</h3>
+                        <p>
+                            Interactive dashboard for constructing and analysing
+                            FTSEMIB equity portfolios, evaluating performance
+                            through the framework of Modern Portfolio Theory.
+                        </p>
+                    </article>
+
+                    <article class="glass-card tilt-card reveal">
+                        <span class="tag">Optimization</span>
+                        <h3>FICO Score Quantization</h3>
+                        <p>
+                            Genetic algorithms applied to find the optimal
+                            binning of FICO credit scores, preserving predictive
+                            power for creditworthiness assessment.
+                        </p>
+                    </article>
+
+                    <article class="glass-card tilt-card reveal">
+                        <span class="tag">Forecasting</span>
+                        <h3>Natural Gas Price Forecast</h3>
+                        <p>
+                            Regression model combining polynomial features and
+                            Fourier series to capture trend and seasonality in
+                            natural gas prices, producing a 12-month forward
+                            forecast.
+                        </p>
+                    </article>
+                </div>
+            </section>
+
+            <section id="skills" class="skills" hidden>
+                <h2 class="reveal">Skills</h2>
+                <div class="glass-card reveal skills-card">
+                    <ul class="skills-list">
+                        <li>Python</li>
+                        <li>Quantitative Finance (CQF)</li>
+                        <li>Derivatives Pricing</li>
+                        <li>Monte Carlo Methods</li>
+                        <li>Portfolio Theory</li>
+                        <li>Numerical Methods</li>
+                        <li>Genetic Algorithms</li>
+                        <li>Time Series Forecasting</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="contact" class="contact">
+                <h2 class="reveal">Get in touch</h2>
+                <div class="contact-links reveal">
+                    <a
+                        href="mailto:fabio.nicotra@outlook.com"
+                        class="btn btn-large"
+                        >fabio.nicotra@outlook.com</a
+                    >
+                    <a
+                        href="https://linkedin.com/in/fabio-nicotra"
+                        class="contact-secondary"
+                        >linkedin.com/in/fabio-nicotra</a
+                    >
+                    <a
+                        href="https://github.com/FabioNicotra"
+                        class="contact-secondary"
+                        >github.com/FabioNicotra</a
+                    >
+                </div>
+            </section>
+
+            <footer class="site-footer">
+                <p>
+                    &copy; <span id="year"></span> Fabio Nicotra. All rights
+                    reserved.
+                </p>
+            </footer>
+        </main>
+
+        <script src="js/main.js"></script>
+    </body>
+</html>
