@@ -113,7 +113,14 @@ body {
   backdrop-filter: blur(12px);
   background: color-mix(in srgb, var(--bg) 55%, transparent);
 }
-.brand { font-weight: 700; letter-spacing: -0.01em; }
+.brand {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+.brand:hover { color: var(--accent-2); }
 .topnav-links { display: flex; gap: 2rem; margin-left: auto; }
 .topnav-links a {
   color: var(--muted);
