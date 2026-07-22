@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Options Portfolio Pricer — Fabio Nicotra</title>
+        <link rel="stylesheet" href="css/style.css" />
+        <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    </head>
+    <body>
+        <div class="blob blob-a"></div>
+        <div class="blob blob-b"></div>
+        <div class="blob blob-c"></div>
+
+        <nav class="topnav">
+            <a class="brand" href="index.html">Fabio Nicotra</a>
+            <div class="topnav-links">
+                <a href="index.html#about">About</a>
+                <a href="index.html#work">Work</a>
+                <a href="index.html#skills">Skills</a>
+                <a href="index.html#contact">Contact</a>
+            </div>
+        </nav>
+
+        <main>
+            <section class="page-hero">
+                <a href="index.html#work" class="section-back">← Work</a>
+                <p class="eyebrow reveal">Interactive Demo</p>
+                <h1 class="reveal">Options Portfolio Pricer</h1>
+                <p class="hero-sub reveal">
+                    Build a portfolio of options on a single underlying and
+                    see its payoff at expiry against the spot price.
+                </p>
+            </section>
+
+            <section class="content">
+                <div class="tool-grid reveal">
+                    <div class="stacked-cards">
+                        <div class="glass-card">
+                            <h2>Common Parameters</h2>
+                            <table class="data-table data-table--params">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>
+                                            <label for="inp-S"
+                                                >Spot price (S)</label
+                                            >
+                                        </td>
+                                        <td>
+                                            <input
+                                                type="number"
+                                                id="inp-S"
+                                                value="100"
+                                                min="0"
+                                                step="1"
+                                            />
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <label for="inp-r"
+                                                >Risk-free rate, %
+                                                (r)</label
+                                            >
+                                        </td>
+                                        <td>
+                                            <input
+                                                type="number"
+                                                id="inp-r"
+                                                value="4"
+                                                min="0"
+                                                step="0.1"
+                                            />
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <label for="inp-sigma"
+                                                >Volatility, % (σ)</label
+                                            >
+                                        </td>
+                                        <td>
+                                            <input
+                                                type="number"
+                                                id="inp-sigma"
+                                                value="20"
+                                                min="0.01"
+                                                step="0.5"
+                                            />
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <label for="inp-T"
+                                                >Time to maturity, years
+                                                (T)</label
+                                            >
+                                        </td>
+                                        <td>
+                                            <input
+                                                type="number"
+                                                id="inp-T"
+                                                value="1"
+                                                min="0.01"
+                                                step="0.05"
+                                            />
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="glass-card">
+                            <h2>Positions</h2>
+                            <table class="data-table" id="positionsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Underlying</th>
+                                        <th>Qty</th>
+                                        <th>Type</th>
+                                        <th>Strike</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tableBody"></tbody>
+                                <tfoot>
+                                    <tr>
+                                        <td colspan="4"></td>
+                                        <td>
+                                            <button
+                                                class="row-action row-action--add"
+                                                type="button"
+                                                aria-label="Add position"
+                                                title="Add position"
+                                                onclick="addRow()"
+                                            >
+                                                +
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                            <div
+                                id="status"
+                                class="tool-status"
+                                style="display: none"
+                            ></div>
+                        </div>
+                    </div>
+
+                    <div class="glass-card chart-card">
+                        <div id="plot"></div>
+                    </div>
+                </div>
+            </section>
+
+            <footer class="site-footer">
+                <p>
+                    &copy; <span id="year"></span> Fabio Nicotra. All rights
+                    reserved.
+                </p>
+            </footer>
+        </main>
+
+        <script src="js/main.js"></script>
+        <script>
+            // No Pyodide, no Python, on this page. The portfolio's payoff at
+            // expiry is plain arithmetic (sum of quantity x intrinsic value),
+            // not an options-pricing model, so it's computed here in JS.
+            // "Portfolio value" (today's price) is intentionally not
+            // computed yet -- that needs a real pricing model, which will
+            // come from a separate Python package once it's published.
+
+            let currentUnderlying = "AAPL";
+            const defaultPositions = [
+                { underlying: "AAPL", quantity: 1, type: "call", strike: 100 },
+                { underlying: "AAPL", quantity: -1, type: "call", strike: 110 },
+            ];
+
+            function getChartTheme() {
+                const computed = getComputedStyle(document.documentElement);
+                const token = (name) => computed.getPropertyValue(name).trim();
+                return {
+                    font: token("--fg"),
+                    grid: token("--grid"),
+                    danger: token("--danger"),
+                };
+            }
+
+            function initializeTable() {
+                const body = document.getElementById("tableBody");
+                body.innerHTML = "";
+                defaultPositions.forEach((p) => {
+                    addRowToTable(p.underlying, p.quantity, p.type, p.strike);
+                });
+            }
+
+            function addRowToTable(underlying, quantity, type, strike) {
+                const body = document.getElementById("tableBody");
+                const row = document.createElement("tr");
+                row.className = "row-enter";
+                row.innerHTML = `
+            <td><input type="text" class="underlying-input" value="${underlying}" placeholder="e.g. AAPL"></td>
+            <td><input type="number" class="quantity-input" value="${quantity}" step="1"></td>
+            <td>
+                <select class="type-input">
+                    <option value="call" ${type === "call" ? "selected" : ""}>Call</option>
+                    <option value="put" ${type === "put" ? "selected" : ""}>Put</option>
+                </select>
+            </td>
+            <td><input type="number" class="strike-input" value="${strike}" min="0.01" step="1"></td>
+            <td>
+                <button class="row-action row-action--remove" type="button" aria-label="Delete position" title="Delete position" onclick="removeRow(this.closest('tr'))">−</button>
+            </td>
+        `;
+                body.appendChild(row);
+
+                const underlyingInput = row.querySelector(".underlying-input");
+                underlyingInput.addEventListener("input", () =>
+                    syncUnderlying(underlyingInput.value),
+                );
+
+                row.querySelector(".quantity-input").addEventListener(
+                    "input",
+                    updatePlot,
+                );
+                row.querySelector(".type-input").addEventListener(
+                    "change",
+                    updatePlot,
+                );
+                row.querySelector(".strike-input").addEventListener(
+                    "input",
+                    updatePlot,
+                );
+
+                // Double rAF: let the browser paint the "row-enter" state
+                // first, then remove it so the transition actually plays.
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        row.classList.remove("row-enter");
+                    });
+                });
+            }
+
+            function addRow() {
+                addRowToTable(currentUnderlying, 1, "call", 100);
+                updatePlot();
+            }
+
+            function removeRow(row) {
+                row.classList.add("row-leave");
+                row.addEventListener("transitionend", () => row.remove(), {
+                    once: true,
+                });
+                updatePlot();
+            }
+
+            function syncUnderlying(value) {
+                currentUnderlying = value;
+                document.querySelectorAll(".underlying-input").forEach((el) => {
+                    if (el.value !== value) el.value = value;
+                });
+            }
+
+            function readCommonParams() {
+                return {
+                    spot: parseFloat(document.getElementById("inp-S").value),
+                    r: parseFloat(document.getElementById("inp-r").value) / 100,
+                    sigma:
+                        parseFloat(
+                            document.getElementById("inp-sigma").value,
+                        ) / 100,
+                    T: parseFloat(document.getElementById("inp-T").value),
+                };
+            }
+
+            function readPositions() {
+                const rows = document.querySelectorAll(
+                    "#tableBody tr:not(.row-leave)",
+                );
+                const positions = [];
+                rows.forEach((row) => {
+                    positions.push({
+                        underlying: row.querySelector(".underlying-input")
+                            .value,
+                        quantity: parseFloat(
+                            row.querySelector(".quantity-input").value,
+                        ),
+                        type: row.querySelector(".type-input").value,
+                        strike: parseFloat(
+                            row.querySelector(".strike-input").value,
+                        ),
+                    });
+                });
+                return positions;
+            }
+
+            function validateInputs(common, positions) {
+                if (positions.length === 0) {
+                    return {
+                        valid: false,
+                        error: "Add at least one position to see the payoff.",
+                    };
+                }
+                if (Number.isNaN(common.spot) || common.spot < 0) {
+                    return {
+                        valid: false,
+                        error: "Spot price must be a non-negative number.",
+                    };
+                }
+                if (Number.isNaN(common.r) || common.r < 0) {
+                    return {
+                        valid: false,
+                        error: "Risk-free rate must be a non-negative number.",
+                    };
+                }
+                if (Number.isNaN(common.sigma) || common.sigma <= 0) {
+                    return {
+                        valid: false,
+                        error: "Volatility must be a positive number.",
+                    };
+                }
+                if (Number.isNaN(common.T) || common.T <= 0) {
+                    return {
+                        valid: false,
+                        error: "Time to maturity must be a positive number.",
+                    };
+                }
+                for (const p of positions) {
+                    if (Number.isNaN(p.quantity)) {
+                        return {
+                            valid: false,
+                            error: "Every position needs a valid quantity.",
+                        };
+                    }
+                    if (Number.isNaN(p.strike) || p.strike <= 0) {
+                        return {
+                            valid: false,
+                            error: "Every position needs a strike greater than zero.",
+                        };
+                    }
+                }
+                return { valid: true };
+            }
+
+            function payoffAt(S, position) {
+                const intrinsic =
+                    position.type === "call"
+                        ? Math.max(S - position.strike, 0)
+                        : Math.max(position.strike - S, 0);
+                return position.quantity * intrinsic;
+            }
+
+            function computePayoffCurve(gridS, positions) {
+                return gridS.map((S) =>
+                    positions.reduce((sum, p) => sum + payoffAt(S, p), 0),
+                );
+            }
+
+            function updatePlot() {
+                const statusEl = document.getElementById("status");
+                const common = readCommonParams();
+                const positions = readPositions();
+                const check = validateInputs(common, positions);
+
+                if (!check.valid) {
+                    statusEl.textContent = check.error;
+                    statusEl.classList.add("error");
+                    statusEl.style.display = "block";
+                    return;
+                }
+
+                const strikes = positions.map((p) => p.strike);
+                const allPrices = [...strikes, common.spot];
+                let lo = Math.max(0, Math.min(...allPrices) * 0.6);
+                let hi = Math.max(...allPrices) * 1.4;
+                if (hi <= lo) hi = lo + 1;
+
+                const nPoints = 200;
+                const gridS = Array.from(
+                    { length: nPoints },
+                    (_, i) => lo + (i * (hi - lo)) / (nPoints - 1),
+                );
+                const payoffCurve = computePayoffCurve(gridS, positions);
+
+                // TODO: once the pricing package is published, compute and
+                // add a "Portfolio value" trace here (today's price vs.
+                // spot), alongside this payoff-at-expiry trace.
+
+                const spotPayoff = positions.reduce(
+                    (sum, p) => sum + payoffAt(common.spot, p),
+                    0,
+                );
+                statusEl.textContent = `Payoff at S=${common.spot}: ${spotPayoff.toFixed(4)}`;
+                statusEl.classList.remove("error");
+                statusEl.style.display = "block";
+
+                renderChart(common, gridS, payoffCurve);
+            }
+
+            function renderChart(common, gridS, payoffCurve) {
+                const theme = getChartTheme();
+
+                const payoffTrace = {
+                    x: gridS,
+                    y: payoffCurve,
+                    mode: "lines",
+                    name: "Payoff at expiry",
+                    line: { color: theme.danger, width: 1.25, dash: "solid" },
+                    hovertemplate:
+                        "S = %{x:.2f}<br>payoff = %{y:.4f}<extra></extra>",
+                };
+
+                const shapes = [
+                    {
+                        type: "line",
+                        xref: "x",
+                        yref: "paper",
+                        x0: common.spot,
+                        x1: common.spot,
+                        y0: 0,
+                        y1: 1,
+                        line: { color: theme.font, width: 1, dash: "dot" },
+                    },
+                ];
+
+                Plotly.newPlot(
+                    "plot",
+                    [payoffTrace],
+                    {
+                        title: {
+                            text: "Portfolio Payoff vs. Spot Price",
+                            font: { color: theme.font },
+                        },
+                        xaxis: {
+                            title: "Spot price S",
+                            gridcolor: theme.grid,
+                            color: theme.font,
+                            zerolinecolor: theme.grid,
+                        },
+                        yaxis: {
+                            title: "Payoff",
+                            gridcolor: theme.grid,
+                            color: theme.font,
+                            zerolinecolor: theme.grid,
+                        },
+                        shapes: shapes,
+                        hovermode: "closest",
+                        plot_bgcolor: "transparent",
+                        paper_bgcolor: "transparent",
+                        font: { color: theme.font },
+                        legend: {
+                            font: { color: theme.font },
+                            orientation: "h",
+                            x: 0.5,
+                            xanchor: "center",
+                            y: -0.15,
+                        },
+                        margin: { l: 60, r: 30, t: 50, b: 90 },
+                    },
+                    { responsive: true },
+                );
+            }
+
+            initializeTable();
+            updatePlot();
+
+            ["inp-S", "inp-r", "inp-sigma", "inp-T"].forEach((id) => {
+                document
+                    .getElementById(id)
+                    .addEventListener("input", updatePlot);
+            });
+
+            window
+                .matchMedia("(prefers-color-scheme: dark)")
+                .addEventListener("change", updatePlot);
+        </script>
+    </body>
+</html>
