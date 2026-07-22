@@ -9,14 +9,12 @@
         <script src="https://cdn.jsdelivr.net/pyodide/v0.26.1/full/pyodide.js"></script>
     </head>
     <body>
-        <div class="progress-bar" id="progressBar"></div>
-
         <div class="blob blob-a"></div>
         <div class="blob blob-b"></div>
         <div class="blob blob-c"></div>
 
         <nav class="topnav">
-            <span class="brand">Fabio Nicotra</span>
+            <a class="brand" href="../index.html">Fabio Nicotra</a>
             <div class="topnav-links">
                 <a href="../index.html#about">About</a>
                 <a href="../index.html#work">Work</a>
@@ -56,16 +54,23 @@
                                 </tr>
                             </thead>
                             <tbody id="tableBody"></tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="2"></td>
+                                    <td>
+                                        <button
+                                            class="row-action row-action--add"
+                                            type="button"
+                                            aria-label="Add row"
+                                            title="Add row"
+                                            onclick="addRow()"
+                                        >
+                                            +
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tfoot>
                         </table>
-                        <div class="tool-add-row">
-                            <button
-                                class="btn btn-small"
-                                onclick="addRow()"
-                                type="button"
-                            >
-                                + Add Row
-                            </button>
-                        </div>
                         <div
                             id="status"
                             class="tool-status"
@@ -202,10 +207,13 @@
             function addRowToTable(x, y) {
                 const body = document.getElementById("tableBody");
                 const row = document.createElement("tr");
+                row.className = "row-enter";
                 row.innerHTML = `
             <td><input type="number" class="x-input" value="${x}" step="0.01"></td>
             <td><input type="number" class="y-input" value="${y}" step="0.01"></td>
-            <td><button class="btn btn-small btn-danger" type="button" onclick="this.closest('tr').remove(); updatePlot()">Delete</button></td>
+            <td>
+                <button class="row-action row-action--remove" type="button" aria-label="Delete row" title="Delete row" onclick="removeRow(this.closest('tr'))">−</button>
+            </td>
         `;
                 body.appendChild(row);
 
@@ -217,6 +225,14 @@
                     "change",
                     updatePlot,
                 );
+
+                // Double rAF: let the browser paint the "row-enter" state
+                // first, then remove it so the transition actually plays.
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        row.classList.remove("row-enter");
+                    });
+                });
             }
 
             function addRow() {
@@ -224,10 +240,20 @@
                 updatePlot();
             }
 
+            function removeRow(row) {
+                row.classList.add("row-leave");
+                row.addEventListener("transitionend", () => row.remove(), {
+                    once: true,
+                });
+                updatePlot();
+            }
+
             async function updatePlot() {
                 if (!pyodide) return;
 
-                const rows = document.querySelectorAll("#tableBody tr");
+                const rows = document.querySelectorAll(
+                    "#tableBody tr:not(.row-leave)",
+                );
                 const xValues = [];
                 const yValues = [];
 
