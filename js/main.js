@@ -1,6 +1,7 @@
 // --- Scroll progress bar ---
 const progressBar = document.getElementById("progressBar");
 function updateProgress() {
+  if (!progressBar) return;
   const scrollTop = window.scrollY;
   const docHeight = document.documentElement.scrollHeight - window.innerHeight;
   const pct = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
