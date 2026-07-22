@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Options Portfolio Pricer — Fabio Nicotra</title>
+        <link rel="stylesheet" href="css/style.css" />
+        <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/pyodide/v0.26.1/full/pyodide.js"></script>
+    </head>
+    <body>
+        <div class="blob blob-a"></div>
+        <div class="blob blob-b"></div>
+        <div class="blob blob-c"></div>
+
+        <nav class="topnav">
+            <a class="brand" href="index.html">Fabio Nicotra</a>
+            <div class="topnav-links">
+                <a href="index.html#about">About</a>
+                <a href="index.html#work">Work</a>
+                <a href="index.html#skills">Skills</a>
+                <a href="index.html#contact">Contact</a>
+            </div>
+        </nav>
+
+        <main>
+            <section class="page-hero">
+                <a href="index.html#work" class="section-back">← Work</a>
+                <p class="eyebrow reveal">Interactive Demo</p>
+                <h1 class="reveal">Options Portfolio Pricer</h1>
+                <p class="hero-sub reveal">
+                    Build a portfolio of options on a single underlying, and
+                    see its value and payoff against the spot price as time
+                    moves toward expiry.
+                </p>
+            </section>
+
+            <section class="content">
+                <div id="loading" class="glass-card tool-loading reveal">
+                    <div class="spinner"></div>
+                    <p>Loading…</p>
+                </div>
+
+                <div id="app" class="tool-grid reveal" style="display: none">
+                    <div class="stacked-cards">
+                        <div class="glass-card">
+                            <h2>Common Parameters</h2>
+                            <table class="data-table data-table--params">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>
+                                            <label for="inp-S"
+                                                >Spot price (S)</label
+                                            >
+                                        </td>
+                                        <td>
+                                            <input
+                                                type="number"
+                                                id="inp-S"
+                                                value="100"
+                                                min="0"
+                                                step="1"
+                                            />
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <label for="inp-r"
+                                                >Risk-free rate, %
+                                                (r)</label
+                                            >
+                                        </td>
+                                        <td>
+                                            <input
+                                                type="number"
+                                                id="inp-r"
+                                                value="4"
+                                                min="0"
+                                                step="0.1"
+                                            />
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <label for="inp-sigma"
+                                                >Volatility, % (σ)</label
+                                            >
+                                        </td>
+                                        <td>
+                                            <input
+                                                type="number"
+                                                id="inp-sigma"
+                                                value="20"
+                                                min="0.01"
+                                                step="0.5"
+                                            />
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <label for="inp-T"
+                                                >Time to maturity, years
+                                                (T)</label
+                                            >
+                                        </td>
+                                        <td>
+                                            <input
+                                                type="number"
+                                                id="inp-T"
+                                                value="1"
+                                                min="0.01"
+                                                step="0.05"
+                                            />
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="glass-card">
+                            <h2>Positions</h2>
+                            <table class="data-table" id="positionsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Qty</th>
+                                        <th>Type</th>
+                                        <th>Strike</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tableBody"></tbody>
+                                <tfoot>
+                                    <tr>
+                                        <td colspan="3"></td>
+                                        <td>
+                                            <button
+                                                class="row-action row-action--add"
+                                                type="button"
+                                                aria-label="Add position"
+                                                title="Add position"
+                                                onclick="addRow()"
+                                            >
+                                                +
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                            <div
+                                id="status"
+                                class="tool-status"
+                                style="display: none"
+                            ></div>
+                        </div>
+                    </div>
+
+                    <div class="glass-card chart-card chart-card--tall">
+                        <div id="plot"></div>
+                    </div>
+                </div>
+            </section>
+
+            <footer class="site-footer">
+                <p>
+                    &copy; <span id="year"></span> Fabio Nicotra. All rights
+                    reserved.
+                </p>
+            </footer>
+        </main>
+
+        <script src="js/main.js"></script>
+        <script>
+            let pyodide;
+            const defaultPositions = [
+                { quantity: 1, type: "call", strike: 100 },
+                { quantity: -1, type: "call", strike: 110 },
+            ];
+
+            function getChartTheme() {
+                const computed = getComputedStyle(document.documentElement);
+                const token = (name) => computed.getPropertyValue(name).trim();
+                return {
+                    font: token("--fg"),
+                    grid: token("--grid"),
+                    danger: token("--danger"),
+                    value: token("--accent-2"),
+                };
+            }
+
+            async function initializePyodide() {
+                pyodide = await loadPyodide();
+                await pyodide.loadPackage([
+                    "micropip",
+                    "numpy",
+                    "matplotlib",
+                    "pandas",
+                ]);
+
+                await pyodide.runPythonAsync(`
+            import micropip
+            await micropip.install('fiqua')
+        `);
+
+                await pyodide.runPythonAsync(`
+            import json
+            from fiqua.equities import Stock, EuropeanOption, portfolio_surface
+            from fiqua.core import Portfolio
+
+            def price_portfolio(positions, spot, r, sigma, T):
+                try:
+                    stock = Stock(spot=spot, rate=r, volatility=sigma)
+                    legs = [
+                        (EuropeanOption(underlying=stock, strike=p["strike"], maturity=T, option_type=p["type"]), p["quantity"])
+                        for p in positions
+                    ]
+                    portfolio = Portfolio(positions=legs)
+                    result = portfolio_surface(portfolio)
+                except (ValueError, TypeError) as e:
+                    return {"success": False, "error": str(e)}
+
+                if not result.solved:
+                    return {"success": False, "error": result.error_msg}
+
+                import numpy as np
+
+                grid_S = result.grid_x
+                grid_t_full = result.grid_t
+                S_max = float(grid_S[-1])
+
+                # Payoff is pure arithmetic (no PDE involved), so evaluate it
+                # on a much finer grid than the PDE's -- the PDE grid (m=100
+                # by default) is coarse enough that payoff's kinks look
+                # jagged, unlike the value curve, which is smooth by
+                # construction and doesn't need this.
+                fine_grid_S = np.linspace(0.0, S_max, 400)
+                payoff_curve = [
+                    sum(pos.quantity * pos.instrument.payoff(float(s)) for pos in portfolio.positions)
+                    for s in fine_grid_S
+                ]
+
+                # Subsample time steps for the slider: keeps the UI usable and
+                # the payload small even when N is large; the solve itself
+                # still ran at full resolution, this only thins which columns
+                # get shipped to the browser.
+                max_frames = 50
+                n_t = len(grid_t_full)
+                if n_t <= max_frames:
+                    idx = list(range(n_t))
+                else:
+                    idx = sorted(set(round(i * (n_t - 1) / (max_frames - 1)) for i in range(max_frames)))
+
+                grid_t = [float(grid_t_full[j]) for j in idx]
+                value_grid = [result.solution[:, j].tolist() for j in idx]
+
+                spot_value = float(np.interp(spot, grid_S, result.solution[:, 0]))
+                spot_payoff = sum(pos.quantity * pos.instrument.payoff(spot) for pos in portfolio.positions)
+
+                return {
+                    "success": True,
+                    "grid_S": grid_S.tolist(),
+                    "fine_grid_S": fine_grid_S.tolist(),
+                    "payoff_curve": payoff_curve,
+                    "grid_t": grid_t,
+                    "value_grid": value_grid,
+                    "S_max": S_max,
+                    "spot_value": spot_value,
+                    "spot_payoff": spot_payoff,
+                }
+        `);
+
+                document.getElementById("loading").style.display = "none";
+                document.getElementById("app").style.display = "grid";
+
+                initializeTable();
+                await updatePlot();
+
+                ["inp-S", "inp-r", "inp-sigma", "inp-T"].forEach((id) => {
+                    document
+                        .getElementById(id)
+                        .addEventListener("change", updatePlot);
+                });
+
+                window
+                    .matchMedia("(prefers-color-scheme: dark)")
+                    .addEventListener("change", () => {
+                        updatePlot();
+                    });
+            }
+
+            function initializeTable() {
+                const body = document.getElementById("tableBody");
+                body.innerHTML = "";
+                defaultPositions.forEach((p) => {
+                    addRowToTable(p.quantity, p.type, p.strike);
+                });
+            }
+
+            function addRowToTable(quantity, type, strike) {
+                const body = document.getElementById("tableBody");
+                const row = document.createElement("tr");
+                row.className = "row-enter";
+                row.innerHTML = `
+            <td><input type="number" class="quantity-input" value="${quantity}" step="1"></td>
+            <td>
+                <select class="type-input">
+                    <option value="call" ${type === "call" ? "selected" : ""}>Call</option>
+                    <option value="put" ${type === "put" ? "selected" : ""}>Put</option>
+                </select>
+            </td>
+            <td><input type="number" class="strike-input" value="${strike}" min="0.01" step="1"></td>
+            <td>
+                <button class="row-action row-action--remove" type="button" aria-label="Delete position" title="Delete position" onclick="removeRow(this.closest('tr'))">−</button>
+            </td>
+        `;
+                body.appendChild(row);
+
+                row.querySelector(".quantity-input").addEventListener(
+                    "change",
+                    updatePlot,
+                );
+                row.querySelector(".type-input").addEventListener(
+                    "change",
+                    updatePlot,
+                );
+                row.querySelector(".strike-input").addEventListener(
+                    "change",
+                    updatePlot,
+                );
+
+                // Double rAF: let the browser paint the "row-enter" state
+                // first, then remove it so the transition actually plays.
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        row.classList.remove("row-enter");
+                    });
+                });
+            }
+
+            function addRow() {
+                addRowToTable(1, "call", 100);
+                updatePlot();
+            }
+
+            function removeRow(row) {
+                row.classList.add("row-leave");
+                row.addEventListener("transitionend", () => row.remove(), {
+                    once: true,
+                });
+                updatePlot();
+            }
+
+            function readCommonParams() {
+                return {
+                    spot: parseFloat(document.getElementById("inp-S").value),
+                    r: parseFloat(document.getElementById("inp-r").value) / 100,
+                    sigma:
+                        parseFloat(
+                            document.getElementById("inp-sigma").value,
+                        ) / 100,
+                    T: parseFloat(document.getElementById("inp-T").value),
+                };
+            }
+
+            function readPositions() {
+                const rows = document.querySelectorAll(
+                    "#tableBody tr:not(.row-leave)",
+                );
+                const positions = [];
+                rows.forEach((row) => {
+                    positions.push({
+                        quantity: parseFloat(
+                            row.querySelector(".quantity-input").value,
+                        ),
+                        type: row.querySelector(".type-input").value,
+                        strike: parseFloat(
+                            row.querySelector(".strike-input").value,
+                        ),
+                    });
+                });
+                return positions;
+            }
+
+            function validateInputs(common, positions) {
+                if (positions.length === 0) {
+                    return {
+                        valid: false,
+                        error: "Add at least one position to see the payoff.",
+                    };
+                }
+                if (Number.isNaN(common.spot) || common.spot <= 0) {
+                    return {
+                        valid: false,
+                        error: "Spot price must be a positive number.",
+                    };
+                }
+                if (Number.isNaN(common.r) || common.r < 0) {
+                    return {
+                        valid: false,
+                        error: "Risk-free rate must be a non-negative number.",
+                    };
+                }
+                if (Number.isNaN(common.sigma) || common.sigma <= 0) {
+                    return {
+                        valid: false,
+                        error: "Volatility must be a positive number.",
+                    };
+                }
+                if (Number.isNaN(common.T) || common.T <= 0) {
+                    return {
+                        valid: false,
+                        error: "Time to maturity must be a positive number.",
+                    };
+                }
+                for (const p of positions) {
+                    if (Number.isNaN(p.quantity)) {
+                        return {
+                            valid: false,
+                            error: "Every position needs a valid quantity.",
+                        };
+                    }
+                    if (Number.isNaN(p.strike) || p.strike <= 0) {
+                        return {
+                            valid: false,
+                            error: "Every position needs a strike greater than zero.",
+                        };
+                    }
+                }
+                return { valid: true };
+            }
+
+            async function updatePlot() {
+                if (!pyodide) return;
+
+                const statusEl = document.getElementById("status");
+                const common = readCommonParams();
+                const positions = readPositions();
+                const check = validateInputs(common, positions);
+
+                if (!check.valid) {
+                    statusEl.textContent = check.error;
+                    statusEl.classList.add("error");
+                    statusEl.style.display = "block";
+                    return;
+                }
+
+                const positionsPayload = positions.map((p) => ({
+                    quantity: p.quantity,
+                    type: p.type,
+                    strike: p.strike,
+                }));
+
+                const resultJson = await pyodide.runPythonAsync(`
+            import json
+            json.dumps(price_portfolio(${JSON.stringify(positionsPayload)}, ${JSON.stringify(common.spot)}, ${JSON.stringify(common.r)}, ${JSON.stringify(common.sigma)}, ${JSON.stringify(common.T)}))
+        `);
+
+                const data = JSON.parse(resultJson);
+
+                if (!data.success) {
+                    statusEl.textContent = data.error;
+                    statusEl.classList.add("error");
+                    statusEl.style.display = "block";
+                    return;
+                }
+
+                statusEl.textContent = `Value at S=${common.spot}: ${data.spot_value.toFixed(4)} (payoff ${data.spot_payoff.toFixed(4)})`;
+                statusEl.classList.remove("error");
+                statusEl.style.display = "block";
+
+                renderChart(common, data);
+            }
+
+            function renderChart(common, data) {
+                const theme = getChartTheme();
+
+                // portfolio_surface() solves on [0, 3x max(strike, spot)] --
+                // wider than what's useful to look at. Trim the display
+                // window the same way black-scholes.html does, without
+                // re-solving anything. Payoff and value live on two
+                // different grids (fine_grid_S vs grid_S), so slice each
+                // independently against the same threshold.
+                const impliedMaxStrikeOrSpot = data.S_max / 3;
+                const displayMax = Math.min(
+                    data.S_max,
+                    Math.max(2 * impliedMaxStrikeOrSpot, common.spot * 1.15),
+                );
+
+                const sliceAt = (arr) => {
+                    let end = arr.findIndex((s) => s > displayMax);
+                    return end === -1 ? arr.length : end;
+                };
+                const payoffEnd = sliceAt(data.fine_grid_S);
+                const valueEnd = sliceAt(data.grid_S);
+
+                const fineS = data.fine_grid_S.slice(0, payoffEnd);
+                const payoffCurve = data.payoff_curve.slice(0, payoffEnd);
+                const S = data.grid_S.slice(0, valueEnd);
+                const valueFrames = data.value_grid.map((row) =>
+                    row.slice(0, valueEnd),
+                );
+
+                const payoffTrace = {
+                    x: fineS,
+                    y: payoffCurve,
+                    mode: "lines",
+                    name: "Payoff at expiry",
+                    line: { color: theme.danger, width: 1.25, dash: "solid" },
+                    hovertemplate:
+                        "S = %{x:.2f}<br>payoff = %{y:.4f}<extra></extra>",
+                };
+                const valueTrace = {
+                    x: S,
+                    y: valueFrames[0],
+                    mode: "lines",
+                    name: "Portfolio value",
+                    line: { color: theme.value, width: 3 },
+                    hovertemplate:
+                        "S = %{x:.2f}<br>value = %{y:.4f}<extra></extra>",
+                };
+
+                const shapes = [
+                    {
+                        type: "line",
+                        xref: "x",
+                        yref: "paper",
+                        x0: common.spot,
+                        x1: common.spot,
+                        y0: 0,
+                        y1: 1,
+                        line: { color: theme.font, width: 1, dash: "dot" },
+                    },
+                ];
+
+                // Payoff (trace 0) never changes with time, so frames only
+                // update the portfolio-value trace (1) as the slider scrubs
+                // from today (t=0) to expiry (t=T).
+                const frames = data.grid_t.map((t, k) => ({
+                    name: `t${k}`,
+                    data: [{ y: valueFrames[k] }],
+                    traces: [1],
+                }));
+
+                const steps = data.grid_t.map((t, k) => ({
+                    label: t.toFixed(2),
+                    method: "animate",
+                    args: [
+                        [`t${k}`],
+                        {
+                            mode: "immediate",
+                            transition: { duration: 0 },
+                            frame: { duration: 0, redraw: true },
+                        },
+                    ],
+                }));
+
+                const layout = {
+                    title: {
+                        text: "Portfolio Value & Payoff vs. Spot Price",
+                        font: { color: theme.font },
+                    },
+                    xaxis: {
+                        title: "Spot price S",
+                        gridcolor: theme.grid,
+                        color: theme.font,
+                        zerolinecolor: theme.grid,
+                    },
+                    yaxis: {
+                        title: "Value / payoff",
+                        gridcolor: theme.grid,
+                        color: theme.font,
+                        zerolinecolor: theme.grid,
+                    },
+                    shapes: shapes,
+                    hovermode: "closest",
+                    plot_bgcolor: "transparent",
+                    paper_bgcolor: "transparent",
+                    font: { color: theme.font },
+                    legend: {
+                        font: { color: theme.font },
+                        orientation: "h",
+                        x: 0.5,
+                        xanchor: "center",
+                        y: -0.15,
+                    },
+                    sliders: [
+                        {
+                            active: 0,
+                            x: 0.1,
+                            len: 0.85,
+                            y: -0.35,
+                            pad: { t: 10 },
+                            currentvalue: {
+                                prefix: "t = ",
+                                suffix: " yr",
+                                font: { color: theme.font },
+                            },
+                            font: { color: theme.font },
+                            bgcolor: theme.grid,
+                            bordercolor: theme.grid,
+                            activebgcolor: theme.value,
+                            steps: steps,
+                        },
+                    ],
+                    margin: { l: 60, r: 30, t: 50, b: 150 },
+                };
+
+                Plotly.newPlot(
+                    "plot",
+                    [payoffTrace, valueTrace],
+                    layout,
+                    { responsive: true },
+                ).then((gd) => {
+                    Plotly.addFrames(gd, frames);
+                });
+            }
+
+            initializePyodide().catch((err) => {
+                document.getElementById("loading").innerHTML =
+                    `<p style="color: var(--danger);">Error: ${err.message}</p>`;
+            });
+        </script>
+    </body>
+</html>

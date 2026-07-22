@@ -369,7 +369,7 @@ section h2 {
 .data-table td:last-child { text-align: center; width: 2.5rem; }
 .data-table--params td:last-child { text-align: left; width: auto; }
 
-.data-table input[type="number"], .data-table select {
+.data-table input[type="number"], .data-table input[type="text"], .data-table select {
   width: 100%;
   background: transparent;
   color: var(--fg);
@@ -381,12 +381,14 @@ section h2 {
   font-size: 0.92rem;
   transition: border-color 0.2s ease, color 0.35s ease;
 }
-.data-table input[type="number"]:focus, .data-table select:focus {
+.data-table input[type="number"]:focus, .data-table input[type="text"]:focus, .data-table select:focus {
   outline: none;
   border-bottom-color: var(--accent-2);
 }
-.data-table input[type="number"]:hover, .data-table select:hover { border-bottom-color: var(--accent-3); }
+.data-table input[type="number"]:hover, .data-table input[type="text"]:hover, .data-table select:hover { border-bottom-color: var(--accent-3); }
 .data-table select { color-scheme: light dark; }
+
+.stacked-cards { display: flex; flex-direction: column; gap: 1.5rem; }
 
 .row-action {
   display: inline-flex;
