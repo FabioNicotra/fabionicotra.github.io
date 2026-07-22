@@ -6,6 +6,7 @@
         <title>Options Portfolio Pricer — Fabio Nicotra</title>
         <link rel="stylesheet" href="css/style.css" />
         <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/pyodide/v0.26.1/full/pyodide.js"></script>
     </head>
     <body>
         <div class="blob blob-a"></div>
@@ -28,13 +29,19 @@
                 <p class="eyebrow reveal">Interactive Demo</p>
                 <h1 class="reveal">Options Portfolio Pricer</h1>
                 <p class="hero-sub reveal">
-                    Build a portfolio of options on a single underlying and
-                    see its payoff at expiry against the spot price.
+                    Build a portfolio of options on a single underlying, and
+                    see its value and payoff against the spot price as time
+                    moves toward expiry.
                 </p>
             </section>
 
             <section class="content">
-                <div class="tool-grid reveal">
+                <div id="loading" class="glass-card tool-loading reveal">
+                    <div class="spinner"></div>
+                    <p>Loading…</p>
+                </div>
+
+                <div id="app" class="tool-grid reveal" style="display: none">
                     <div class="stacked-cards">
                         <div class="glass-card">
                             <h2>Common Parameters</h2>
@@ -121,7 +128,6 @@
                             <table class="data-table" id="positionsTable">
                                 <thead>
                                     <tr>
-                                        <th>Underlying</th>
                                         <th>Qty</th>
                                         <th>Type</th>
                                         <th>Strike</th>
@@ -131,7 +137,7 @@
                                 <tbody id="tableBody"></tbody>
                                 <tfoot>
                                     <tr>
-                                        <td colspan="4"></td>
+                                        <td colspan="3"></td>
                                         <td>
                                             <button
                                                 class="row-action row-action--add"
@@ -154,7 +160,7 @@
                         </div>
                     </div>
 
-                    <div class="glass-card chart-card">
+                    <div class="glass-card chart-card chart-card--tall">
                         <div id="plot"></div>
                     </div>
                 </div>
@@ -170,17 +176,10 @@
 
         <script src="js/main.js"></script>
         <script>
-            // No Pyodide, no Python, on this page. The portfolio's payoff at
-            // expiry is plain arithmetic (sum of quantity x intrinsic value),
-            // not an options-pricing model, so it's computed here in JS.
-            // "Portfolio value" (today's price) is intentionally not
-            // computed yet -- that needs a real pricing model, which will
-            // come from a separate Python package once it's published.
-
-            let currentUnderlying = "AAPL";
+            let pyodide;
             const defaultPositions = [
-                { underlying: "AAPL", quantity: 1, type: "call", strike: 100 },
-                { underlying: "AAPL", quantity: -1, type: "call", strike: 110 },
+                { quantity: 1, type: "call", strike: 100 },
+                { quantity: -1, type: "call", strike: 110 },
             ];
 
             function getChartTheme() {
@@ -190,23 +189,123 @@
                     font: token("--fg"),
                     grid: token("--grid"),
                     danger: token("--danger"),
+                    value: token("--accent-2"),
                 };
+            }
+
+            async function initializePyodide() {
+                pyodide = await loadPyodide();
+                await pyodide.loadPackage([
+                    "micropip",
+                    "numpy",
+                    "matplotlib",
+                    "pandas",
+                ]);
+
+                await pyodide.runPythonAsync(`
+            import micropip
+            await micropip.install('fiqua')
+        `);
+
+                await pyodide.runPythonAsync(`
+            import json
+            from fiqua.equities import Stock, EuropeanOption, portfolio_surface
+            from fiqua.core import Portfolio
+
+            def price_portfolio(positions, spot, r, sigma, T):
+                try:
+                    stock = Stock(spot=spot, rate=r, volatility=sigma)
+                    legs = [
+                        (EuropeanOption(underlying=stock, strike=p["strike"], maturity=T, option_type=p["type"]), p["quantity"])
+                        for p in positions
+                    ]
+                    portfolio = Portfolio(positions=legs)
+                    result = portfolio_surface(portfolio)
+                except (ValueError, TypeError) as e:
+                    return {"success": False, "error": str(e)}
+
+                if not result.solved:
+                    return {"success": False, "error": result.error_msg}
+
+                import numpy as np
+
+                grid_S = result.grid_x
+                grid_t_full = result.grid_t
+                S_max = float(grid_S[-1])
+
+                # Payoff is pure arithmetic (no PDE involved), so evaluate it
+                # on a much finer grid than the PDE's -- the PDE grid (m=100
+                # by default) is coarse enough that payoff's kinks look
+                # jagged, unlike the value curve, which is smooth by
+                # construction and doesn't need this.
+                fine_grid_S = np.linspace(0.0, S_max, 400)
+                payoff_curve = [
+                    sum(pos.quantity * pos.instrument.payoff(float(s)) for pos in portfolio.positions)
+                    for s in fine_grid_S
+                ]
+
+                # Subsample time steps for the slider: keeps the UI usable and
+                # the payload small even when N is large; the solve itself
+                # still ran at full resolution, this only thins which columns
+                # get shipped to the browser.
+                max_frames = 50
+                n_t = len(grid_t_full)
+                if n_t <= max_frames:
+                    idx = list(range(n_t))
+                else:
+                    idx = sorted(set(round(i * (n_t - 1) / (max_frames - 1)) for i in range(max_frames)))
+
+                grid_t = [float(grid_t_full[j]) for j in idx]
+                value_grid = [result.solution[:, j].tolist() for j in idx]
+
+                spot_value = float(np.interp(spot, grid_S, result.solution[:, 0]))
+                spot_payoff = sum(pos.quantity * pos.instrument.payoff(spot) for pos in portfolio.positions)
+
+                return {
+                    "success": True,
+                    "grid_S": grid_S.tolist(),
+                    "fine_grid_S": fine_grid_S.tolist(),
+                    "payoff_curve": payoff_curve,
+                    "grid_t": grid_t,
+                    "value_grid": value_grid,
+                    "S_max": S_max,
+                    "spot_value": spot_value,
+                    "spot_payoff": spot_payoff,
+                }
+        `);
+
+                document.getElementById("loading").style.display = "none";
+                document.getElementById("app").style.display = "grid";
+
+                initializeTable();
+                await updatePlot();
+
+                ["inp-S", "inp-r", "inp-sigma", "inp-T"].forEach((id) => {
+                    document
+                        .getElementById(id)
+                        .addEventListener("change", updatePlot);
+                });
+
+                window
+                    .matchMedia("(prefers-color-scheme: dark)")
+                    .addEventListener("change", () => {
+                        updatePlot();
+                    });
             }
 
             function initializeTable() {
                 const body = document.getElementById("tableBody");
                 body.innerHTML = "";
                 defaultPositions.forEach((p) => {
-                    addRowToTable(p.underlying, p.quantity, p.type, p.strike);
+                    addRowToTable(p.quantity, p.type, p.strike);
                 });
             }
 
-            function addRowToTable(underlying, quantity, type, strike) {
+            function addRowToTable(quantity, type, strike) {
                 const body = document.getElementById("tableBody");
                 const row = document.createElement("tr");
                 row.className = "row-enter";
                 row.innerHTML = `
-            <td><input type="text" class="underlying-input" value="${underlying}" placeholder="e.g. AAPL"></td>
             <td><input type="number" class="quantity-input" value="${quantity}" step="1"></td>
             <td>
                 <select class="type-input">
@@ -221,13 +320,8 @@
         `;
                 body.appendChild(row);
 
-                const underlyingInput = row.querySelector(".underlying-input");
-                underlyingInput.addEventListener("input", () =>
-                    syncUnderlying(underlyingInput.value),
-                );
-
                 row.querySelector(".quantity-input").addEventListener(
-                    "input",
+                    "change",
                     updatePlot,
                 );
                 row.querySelector(".type-input").addEventListener(
@@ -235,7 +329,7 @@
                     updatePlot,
                 );
                 row.querySelector(".strike-input").addEventListener(
-                    "input",
+                    "change",
                     updatePlot,
                 );
 
@@ -249,7 +343,7 @@
             }
 
             function addRow() {
-                addRowToTable(currentUnderlying, 1, "call", 100);
+                addRowToTable(1, "call", 100);
                 updatePlot();
             }
 
@@ -259,13 +353,6 @@
                     once: true,
                 });
                 updatePlot();
-            }
-
-            function syncUnderlying(value) {
-                currentUnderlying = value;
-                document.querySelectorAll(".underlying-input").forEach((el) => {
-                    if (el.value !== value) el.value = value;
-                });
             }
 
             function readCommonParams() {
@@ -287,8 +374,6 @@
                 const positions = [];
                 rows.forEach((row) => {
                     positions.push({
-                        underlying: row.querySelector(".underlying-input")
-                            .value,
                         quantity: parseFloat(
                             row.querySelector(".quantity-input").value,
                         ),
@@ -308,10 +393,10 @@
                         error: "Add at least one position to see the payoff.",
                     };
                 }
-                if (Number.isNaN(common.spot) || common.spot < 0) {
+                if (Number.isNaN(common.spot) || common.spot <= 0) {
                     return {
                         valid: false,
-                        error: "Spot price must be a non-negative number.",
+                        error: "Spot price must be a positive number.",
                     };
                 }
                 if (Number.isNaN(common.r) || common.r < 0) {
@@ -349,21 +434,9 @@
                 return { valid: true };
             }
 
-            function payoffAt(S, position) {
-                const intrinsic =
-                    position.type === "call"
-                        ? Math.max(S - position.strike, 0)
-                        : Math.max(position.strike - S, 0);
-                return position.quantity * intrinsic;
-            }
+            async function updatePlot() {
+                if (!pyodide) return;
 
-            function computePayoffCurve(gridS, positions) {
-                return gridS.map((S) =>
-                    positions.reduce((sum, p) => sum + payoffAt(S, p), 0),
-                );
-            }
-
-            function updatePlot() {
                 const statusEl = document.getElementById("status");
                 const common = readCommonParams();
                 const positions = readPositions();
@@ -376,45 +449,79 @@
                     return;
                 }
 
-                const strikes = positions.map((p) => p.strike);
-                const allPrices = [...strikes, common.spot];
-                let lo = Math.max(0, Math.min(...allPrices) * 0.6);
-                let hi = Math.max(...allPrices) * 1.4;
-                if (hi <= lo) hi = lo + 1;
+                const positionsPayload = positions.map((p) => ({
+                    quantity: p.quantity,
+                    type: p.type,
+                    strike: p.strike,
+                }));
 
-                const nPoints = 200;
-                const gridS = Array.from(
-                    { length: nPoints },
-                    (_, i) => lo + (i * (hi - lo)) / (nPoints - 1),
-                );
-                const payoffCurve = computePayoffCurve(gridS, positions);
+                const resultJson = await pyodide.runPythonAsync(`
+            import json
+            json.dumps(price_portfolio(${JSON.stringify(positionsPayload)}, ${JSON.stringify(common.spot)}, ${JSON.stringify(common.r)}, ${JSON.stringify(common.sigma)}, ${JSON.stringify(common.T)}))
+        `);
 
-                // TODO: once the pricing package is published, compute and
-                // add a "Portfolio value" trace here (today's price vs.
-                // spot), alongside this payoff-at-expiry trace.
+                const data = JSON.parse(resultJson);
 
-                const spotPayoff = positions.reduce(
-                    (sum, p) => sum + payoffAt(common.spot, p),
-                    0,
-                );
-                statusEl.textContent = `Payoff at S=${common.spot}: ${spotPayoff.toFixed(4)}`;
+                if (!data.success) {
+                    statusEl.textContent = data.error;
+                    statusEl.classList.add("error");
+                    statusEl.style.display = "block";
+                    return;
+                }
+
+                statusEl.textContent = `Value at S=${common.spot}: ${data.spot_value.toFixed(4)} (payoff ${data.spot_payoff.toFixed(4)})`;
                 statusEl.classList.remove("error");
                 statusEl.style.display = "block";
 
-                renderChart(common, gridS, payoffCurve);
+                renderChart(common, data);
             }
 
-            function renderChart(common, gridS, payoffCurve) {
+            function renderChart(common, data) {
                 const theme = getChartTheme();
 
+                // portfolio_surface() solves on [0, 3x max(strike, spot)] --
+                // wider than what's useful to look at. Trim the display
+                // window the same way black-scholes.html does, without
+                // re-solving anything. Payoff and value live on two
+                // different grids (fine_grid_S vs grid_S), so slice each
+                // independently against the same threshold.
+                const impliedMaxStrikeOrSpot = data.S_max / 3;
+                const displayMax = Math.min(
+                    data.S_max,
+                    Math.max(2 * impliedMaxStrikeOrSpot, common.spot * 1.15),
+                );
+
+                const sliceAt = (arr) => {
+                    let end = arr.findIndex((s) => s > displayMax);
+                    return end === -1 ? arr.length : end;
+                };
+                const payoffEnd = sliceAt(data.fine_grid_S);
+                const valueEnd = sliceAt(data.grid_S);
+
+                const fineS = data.fine_grid_S.slice(0, payoffEnd);
+                const payoffCurve = data.payoff_curve.slice(0, payoffEnd);
+                const S = data.grid_S.slice(0, valueEnd);
+                const valueFrames = data.value_grid.map((row) =>
+                    row.slice(0, valueEnd),
+                );
+
                 const payoffTrace = {
-                    x: gridS,
+                    x: fineS,
                     y: payoffCurve,
                     mode: "lines",
                     name: "Payoff at expiry",
                     line: { color: theme.danger, width: 1.25, dash: "solid" },
                     hovertemplate:
                         "S = %{x:.2f}<br>payoff = %{y:.4f}<extra></extra>",
+                };
+                const valueTrace = {
+                    x: S,
+                    y: valueFrames[0],
+                    mode: "lines",
+                    name: "Portfolio value",
+                    line: { color: theme.value, width: 3 },
+                    hovertemplate:
+                        "S = %{x:.2f}<br>value = %{y:.4f}<extra></extra>",
                 };
 
                 const shapes = [
@@ -430,56 +537,93 @@
                     },
                 ];
 
+                // Payoff (trace 0) never changes with time, so frames only
+                // update the portfolio-value trace (1) as the slider scrubs
+                // from today (t=0) to expiry (t=T).
+                const frames = data.grid_t.map((t, k) => ({
+                    name: `t${k}`,
+                    data: [{ y: valueFrames[k] }],
+                    traces: [1],
+                }));
+
+                const steps = data.grid_t.map((t, k) => ({
+                    label: t.toFixed(2),
+                    method: "animate",
+                    args: [
+                        [`t${k}`],
+                        {
+                            mode: "immediate",
+                            transition: { duration: 0 },
+                            frame: { duration: 0, redraw: true },
+                        },
+                    ],
+                }));
+
+                const layout = {
+                    title: {
+                        text: "Portfolio Value & Payoff vs. Spot Price",
+                        font: { color: theme.font },
+                    },
+                    xaxis: {
+                        title: "Spot price S",
+                        gridcolor: theme.grid,
+                        color: theme.font,
+                        zerolinecolor: theme.grid,
+                    },
+                    yaxis: {
+                        title: "Value / payoff",
+                        gridcolor: theme.grid,
+                        color: theme.font,
+                        zerolinecolor: theme.grid,
+                    },
+                    shapes: shapes,
+                    hovermode: "closest",
+                    plot_bgcolor: "transparent",
+                    paper_bgcolor: "transparent",
+                    font: { color: theme.font },
+                    legend: {
+                        font: { color: theme.font },
+                        orientation: "h",
+                        x: 0.5,
+                        xanchor: "center",
+                        y: -0.15,
+                    },
+                    sliders: [
+                        {
+                            active: 0,
+                            x: 0.1,
+                            len: 0.85,
+                            y: -0.35,
+                            pad: { t: 10 },
+                            currentvalue: {
+                                prefix: "t = ",
+                                suffix: " yr",
+                                font: { color: theme.font },
+                            },
+                            font: { color: theme.font },
+                            bgcolor: theme.grid,
+                            bordercolor: theme.grid,
+                            activebgcolor: theme.value,
+                            steps: steps,
+                        },
+                    ],
+                    margin: { l: 60, r: 30, t: 50, b: 150 },
+                };
+
                 Plotly.newPlot(
                     "plot",
-                    [payoffTrace],
-                    {
-                        title: {
-                            text: "Portfolio Payoff vs. Spot Price",
-                            font: { color: theme.font },
-                        },
-                        xaxis: {
-                            title: "Spot price S",
-                            gridcolor: theme.grid,
-                            color: theme.font,
-                            zerolinecolor: theme.grid,
-                        },
-                        yaxis: {
-                            title: "Payoff",
-                            gridcolor: theme.grid,
-                            color: theme.font,
-                            zerolinecolor: theme.grid,
-                        },
-                        shapes: shapes,
-                        hovermode: "closest",
-                        plot_bgcolor: "transparent",
-                        paper_bgcolor: "transparent",
-                        font: { color: theme.font },
-                        legend: {
-                            font: { color: theme.font },
-                            orientation: "h",
-                            x: 0.5,
-                            xanchor: "center",
-                            y: -0.15,
-                        },
-                        margin: { l: 60, r: 30, t: 50, b: 90 },
-                    },
+                    [payoffTrace, valueTrace],
+                    layout,
                     { responsive: true },
-                );
+                ).then((gd) => {
+                    Plotly.addFrames(gd, frames);
+                });
             }
 
-            initializeTable();
-            updatePlot();
-
-            ["inp-S", "inp-r", "inp-sigma", "inp-T"].forEach((id) => {
-                document
-                    .getElementById(id)
-                    .addEventListener("input", updatePlot);
+            initializePyodide().catch((err) => {
+                document.getElementById("loading").innerHTML =
+                    `<p style="color: var(--danger);">Error: ${err.message}</p>`;
             });
-
-            window
-                .matchMedia("(prefers-color-scheme: dark)")
-                .addEventListener("change", updatePlot);
         </script>
     </body>
 </html>
