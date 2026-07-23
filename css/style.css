@@ -332,6 +332,10 @@ section h2 {
 @media (max-width: 860px) {
   .tool-grid { grid-template-columns: 1fr; }
 }
+/* Positions needs the full row width for one entry per line (see
+   .position-row below) -- it can't share the narrow 1fr track with
+   Common Parameters the way the other stacked-cards pages do. */
+.tool-grid > .position-panel { grid-column: 1 / -1; }
 
 .tool-loading {
   text-align: center;
@@ -501,7 +505,6 @@ section h2 {
 .direction-btn.is-active[data-direction="long"] { background: var(--success); color: #fff; }
 .direction-btn.is-active[data-direction="short"] { background: var(--danger); color: #fff; }
 
-.position-row .row-action--remove { margin-left: auto; }
 
 @media (max-width: 600px) {
   .position-row {
