@@ -10,7 +10,6 @@
   --glass-bg: rgba(255,255,255,0.55);
   --glass-border: rgba(255,255,255,0.75);
   --glass-shadow: 0 25px 50px -30px rgba(10,25,45,0.28);
-  --blob-opacity: 0.22;
   --success: #2f9c6e;
   --success-bg: #e3f5ec;
   --success-fg: #175c3f;
@@ -33,7 +32,6 @@
     --glass-bg: rgba(255,255,255,0.05);
     --glass-border: rgba(255,255,255,0.14);
     --glass-shadow: 0 20px 50px -30px rgba(0,0,0,0.6);
-    --blob-opacity: 0.32;
     --success: #3fb37f;
     --success-bg: rgba(47,156,110,0.15);
     --success-fg: #8fdcb3;
@@ -77,29 +75,11 @@ body {
 }
 .back-link:hover { color: var(--fg); }
 
-.progress-bar {
-  position: fixed;
-  top: 0; left: 0;
-  height: 3px;
-  width: 0%;
-  background: linear-gradient(90deg, var(--accent-1), var(--accent-2), var(--accent-3));
-  z-index: 200;
-  transition: width 0.1s linear;
+a:focus-visible, button:focus-visible, .btn:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 3px;
+  border-radius: 4px;
 }
-
-.blob {
-  position: fixed;
-  border-radius: 50%;
-  filter: blur(90px);
-  opacity: var(--blob-opacity);
-  z-index: 0;
-  pointer-events: none;
-  will-change: transform;
-  transition: opacity 0.4s ease, background-color 0.4s ease;
-}
-.blob-a { width: 480px; height: 480px; top: -100px; left: -100px; background: var(--accent-1); }
-.blob-b { width: 420px; height: 420px; top: 40%; right: -140px; background: var(--accent-2); }
-.blob-c { width: 380px; height: 380px; bottom: -160px; left: 30%; background: var(--accent-3); }
 
 .topnav {
   position: fixed;
@@ -212,11 +192,13 @@ section h2 {
   gap: 1.5rem;
 }
 .tilt-card {
-  transition: transform 0.15s ease-out, border-color 0.2s ease, background-color 0.35s ease, box-shadow 0.35s ease;
-  transform-style: preserve-3d;
-  will-change: transform;
+  transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.35s ease, box-shadow 0.35s ease;
 }
-.tilt-card:hover { border-color: var(--accent-1); }
+.tilt-card:hover {
+  border-color: var(--accent-1);
+  transform: translateY(-3px);
+  box-shadow: var(--glass-shadow);
+}
 .tag {
   display: inline-block;
   font-size: 0.72rem;
@@ -426,18 +408,27 @@ section h2 {
 
 .tool-status {
   margin-top: 1rem;
-  padding: 0.65rem 0.9rem;
+  padding: 0.6rem 0.9rem;
   border-radius: 8px;
   font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
   background: var(--success-bg);
-  border-left: 3px solid var(--success);
+  border: 1px solid color-mix(in srgb, var(--success) 35%, transparent);
   color: var(--success-fg);
+}
+.tool-status::before {
+  content: "✓";
+  font-weight: 700;
+  flex-shrink: 0;
 }
 .tool-status.error {
   background: var(--danger-bg);
-  border-left-color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
   color: var(--danger-fg);
 }
+.tool-status.error::before { content: "!"; }
 
 .chart-card { padding: 1.25rem; }
 #plot { width: 100%; height: 460px; }
