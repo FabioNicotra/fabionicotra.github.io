@@ -81,10 +81,12 @@ body {
   position: fixed;
   top: 0; left: 0;
   height: 3px;
-  width: 0%;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: left;
   background: linear-gradient(90deg, var(--accent-1), var(--accent-2), var(--accent-3));
   z-index: 200;
-  transition: width 0.1s linear;
+  transition: transform 0.1s linear;
 }
 
 .blob {
@@ -520,18 +522,27 @@ section h2 {
 
 .tool-status {
   margin-top: 1rem;
-  padding: 0.65rem 0.9rem;
+  padding: 0.6rem 0.9rem;
   border-radius: 8px;
   font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
   background: var(--success-bg);
-  border-left: 3px solid var(--success);
+  border: 1px solid color-mix(in srgb, var(--success) 35%, transparent);
   color: var(--success-fg);
+}
+.tool-status::before {
+  content: "✓";
+  font-weight: 700;
+  flex-shrink: 0;
 }
 .tool-status.error {
   background: var(--danger-bg);
-  border-left-color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
   color: var(--danger-fg);
 }
+.tool-status.error::before { content: "!"; }
 
 .chart-card { padding: 1.25rem; }
 #plot { width: 100%; height: 460px; }
