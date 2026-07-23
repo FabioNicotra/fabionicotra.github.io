@@ -412,16 +412,110 @@ section h2 {
 .row-action--add { color: var(--success); }
 
 /* Row add/remove micro-animation: opacity + slight vertical slide. */
-#tableBody tr {
+#tableBody tr,
+#tableBody .position-row {
   transition: opacity 0.25s ease, transform 0.25s ease;
 }
-#tableBody tr.row-enter {
+#tableBody tr.row-enter,
+#tableBody .position-row.row-enter {
   opacity: 0;
   transform: translateY(-6px);
 }
-#tableBody tr.row-leave {
+#tableBody tr.row-leave,
+#tableBody .position-row.row-leave {
   opacity: 0;
   transform: translateY(6px);
+}
+
+/* --- Position list (portfolio pricer) ---
+   A table's columns get too narrow to read "Call"/"Put" once there are
+   4+ of them on a small screen, so positions use labeled flex fields
+   instead, which can stack vertically on mobile. */
+.position-list { display: flex; flex-direction: column; }
+.position-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.7rem 1rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--glass-border);
+  position: relative;
+}
+.position-row:last-child { border-bottom: none; padding-bottom: 0.5rem; }
+.position-field { display: flex; flex-direction: column; gap: 0.3rem; }
+.position-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.position-field--qty { width: 4.5rem; }
+.position-field--type { width: 6.5rem; }
+.position-field--strike { width: 6rem; }
+
+.position-row input[type="number"],
+.position-row select {
+  width: 100%;
+  background: transparent;
+  color: var(--fg);
+  border: none;
+  border-bottom: 1.5px solid var(--glass-border);
+  border-radius: 0;
+  padding: 0.4rem 0.25rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease, color 0.35s ease;
+}
+.position-row input[type="number"]:focus,
+.position-row select:focus {
+  outline: none;
+  border-bottom-color: var(--accent-2);
+}
+.position-row input[type="number"]:hover,
+.position-row select:hover { border-bottom-color: var(--accent-3); }
+.position-row select { color-scheme: light dark; }
+
+.direction-toggle {
+  display: inline-flex;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--glass-bg) 70%, transparent);
+  border: 1px solid var(--glass-border);
+  padding: 2px;
+  gap: 2px;
+}
+.direction-btn {
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.direction-btn:hover { color: var(--fg); }
+.direction-btn.is-active[data-direction="long"] { background: var(--success); color: #fff; }
+.direction-btn.is-active[data-direction="short"] { background: var(--danger); color: #fff; }
+
+.position-row .row-action--remove { margin-left: auto; }
+
+@media (max-width: 600px) {
+  .position-row {
+    flex-direction: column;
+    align-items: stretch;
+    padding-right: 2.2rem;
+  }
+  .position-field--qty, .position-field--type, .position-field--strike {
+    width: 100%;
+  }
+  .position-row .row-action--remove {
+    position: absolute;
+    top: 1rem;
+    right: 0;
+    margin-left: 0;
+  }
 }
 
 .tool-status {

@@ -125,33 +125,14 @@
 
                         <div class="glass-card">
                             <h2>Positions</h2>
-                            <table class="data-table" id="positionsTable">
-                                <thead>
-                                    <tr>
-                                        <th>Qty</th>
-                                        <th>Type</th>
-                                        <th>Strike</th>
-                                        <th></th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tableBody"></tbody>
-                                <tfoot>
-                                    <tr>
-                                        <td colspan="3"></td>
-                                        <td>
-                                            <button
-                                                class="row-action row-action--add"
-                                                type="button"
-                                                aria-label="Add position"
-                                                title="Add position"
-                                                onclick="addRow()"
-                                            >
-                                                +
-                                            </button>
-                                        </td>
-                                    </tr>
-                                </tfoot>
-                            </table>
+                            <div class="position-list" id="tableBody"></div>
+                            <button
+                                class="btn btn-small"
+                                type="button"
+                                onclick="addRow()"
+                            >
+                                + Add position
+                            </button>
                             <div
                                 id="status"
                                 class="tool-status"
@@ -178,8 +159,8 @@
         <script>
             let pyodide;
             const defaultPositions = [
-                { quantity: 1, type: "call", strike: 100 },
-                { quantity: -1, type: "call", strike: 110 },
+                { quantity: 1, type: "call", strike: 100, direction: "long" },
+                { quantity: 1, type: "call", strike: 110, direction: "short" },
             ];
 
             function getChartTheme() {
@@ -297,33 +278,67 @@
                 const body = document.getElementById("tableBody");
                 body.innerHTML = "";
                 defaultPositions.forEach((p) => {
-                    addRowToTable(p.quantity, p.type, p.strike);
+                    addRowToTable(p.quantity, p.type, p.strike, p.direction);
                 });
             }
 
-            function addRowToTable(quantity, type, strike) {
+            function setRowDirection(row, direction) {
+                row.dataset.direction = direction;
+                row.querySelectorAll(".direction-btn").forEach((btn) => {
+                    const isActive = btn.dataset.direction === direction;
+                    btn.classList.toggle("is-active", isActive);
+                    btn.setAttribute("aria-pressed", String(isActive));
+                });
+            }
+
+            function addRowToTable(quantity, type, strike, direction = "long") {
                 const body = document.getElementById("tableBody");
-                const row = document.createElement("tr");
-                row.className = "row-enter";
+                const row = document.createElement("div");
+                row.className = "position-row row-enter";
                 row.innerHTML = `
-            <td><input type="number" class="quantity-input" value="${quantity}" step="1"></td>
-            <td>
+            <div class="position-field position-field--direction">
+                <span class="position-label">Direction</span>
+                <div class="direction-toggle" role="group" aria-label="Position direction">
+                    <button type="button" class="direction-btn" data-direction="long">Long</button>
+                    <button type="button" class="direction-btn" data-direction="short">Short</button>
+                </div>
+            </div>
+            <div class="position-field position-field--qty">
+                <label class="position-label">Qty</label>
+                <input type="number" class="quantity-input" value="${Math.abs(quantity)}" min="0" step="1" inputmode="numeric">
+            </div>
+            <div class="position-field position-field--type">
+                <label class="position-label">Type</label>
                 <select class="type-input">
                     <option value="call" ${type === "call" ? "selected" : ""}>Call</option>
                     <option value="put" ${type === "put" ? "selected" : ""}>Put</option>
                 </select>
-            </td>
-            <td><input type="number" class="strike-input" value="${strike}" min="0.01" step="1"></td>
-            <td>
-                <button class="row-action row-action--remove" type="button" aria-label="Delete position" title="Delete position" onclick="removeRow(this.closest('tr'))">−</button>
-            </td>
+            </div>
+            <div class="position-field position-field--strike">
+                <label class="position-label">Strike</label>
+                <input type="number" class="strike-input" value="${strike}" min="0.01" step="1" inputmode="decimal">
+            </div>
+            <button class="row-action row-action--remove" type="button" aria-label="Delete position" title="Delete position" onclick="removeRow(this.closest('.position-row'))">−</button>
         `;
                 body.appendChild(row);
+                setRowDirection(row, direction);
 
-                row.querySelector(".quantity-input").addEventListener(
-                    "change",
-                    updatePlot,
-                );
+                row.querySelectorAll(".direction-btn").forEach((btn) => {
+                    btn.addEventListener("click", () => {
+                        setRowDirection(row, btn.dataset.direction);
+                        updatePlot();
+                    });
+                });
+
+                const quantityInput = row.querySelector(".quantity-input");
+                quantityInput.addEventListener("input", () => {
+                    // Direction is chosen with the toggle above, not the sign
+                    // of the number, so strip any negative the user types in.
+                    if (quantityInput.value !== "" && parseFloat(quantityInput.value) < 0) {
+                        quantityInput.value = Math.abs(parseFloat(quantityInput.value));
+                    }
+                });
+                quantityInput.addEventListener("change", updatePlot);
                 row.querySelector(".type-input").addEventListener(
                     "change",
                     updatePlot,
@@ -343,7 +358,7 @@
             }
 
             function addRow() {
-                addRowToTable(1, "call", 100);
+                addRowToTable(1, "call", 100, "long");
                 updatePlot();
             }
 
@@ -369,14 +384,18 @@
 
             function readPositions() {
                 const rows = document.querySelectorAll(
-                    "#tableBody tr:not(.row-leave)",
+                    "#tableBody .position-row:not(.row-leave)",
                 );
                 const positions = [];
                 rows.forEach((row) => {
+                    const magnitude = parseFloat(
+                        row.querySelector(".quantity-input").value,
+                    );
+                    const sign = row.dataset.direction === "short" ? -1 : 1;
                     positions.push({
-                        quantity: parseFloat(
-                            row.querySelector(".quantity-input").value,
-                        ),
+                        quantity: Number.isNaN(magnitude)
+                            ? magnitude
+                            : sign * magnitude,
                         type: row.querySelector(".type-input").value,
                         strike: parseFloat(
                             row.querySelector(".strike-input").value,
@@ -418,10 +437,10 @@
                     };
                 }
                 for (const p of positions) {
-                    if (Number.isNaN(p.quantity)) {
+                    if (Number.isNaN(p.quantity) || Math.abs(p.quantity) <= 0) {
                         return {
                             valid: false,
-                            error: "Every position needs a valid quantity.",
+                            error: "Every position needs a quantity greater than zero.",
                         };
                     }
                     if (Number.isNaN(p.strike) || p.strike <= 0) {
