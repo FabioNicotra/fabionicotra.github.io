@@ -41,24 +41,9 @@
                     <p>Loading…</p>
                 </div>
 
-                <div id="app" class="tool-grid reveal" style="display: none">
-                    <div class="glass-card position-panel">
-                        <h2>Positions</h2>
-                        <div class="position-list" id="tableBody"></div>
-                        <button
-                            class="row-action row-action--add"
-                            type="button"
-                            aria-label="Add position"
-                            title="Add position"
-                            onclick="addRow()"
-                        >
-                            +
-                        </button>
-                        <div
-                            id="status"
-                            class="tool-status"
-                            style="display: none"
-                        ></div>
+                <div id="app" class="tool-grid pricer-grid reveal" style="display: none">
+                    <div class="glass-card chart-card chart-card--tall">
+                        <div id="plot"></div>
                     </div>
 
                     <div class="glass-card">
@@ -141,8 +126,43 @@
                         </table>
                     </div>
 
-                    <div class="glass-card chart-card chart-card--tall">
-                        <div id="plot"></div>
+                    <div class="glass-card">
+                        <h2>Positions</h2>
+                        <div class="table-scroll">
+                            <table class="data-table data-table--positions" id="positionsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Direction</th>
+                                        <th>Qty</th>
+                                        <th>Type</th>
+                                        <th>Strike</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tableBody"></tbody>
+                                <tfoot>
+                                    <tr>
+                                        <td colspan="4"></td>
+                                        <td>
+                                            <button
+                                                class="row-action row-action--add"
+                                                type="button"
+                                                aria-label="Add position"
+                                                title="Add position"
+                                                onclick="addRow()"
+                                            >
+                                                +
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        <div
+                            id="status"
+                            class="tool-status"
+                            style="display: none"
+                        ></div>
                     </div>
                 </div>
             </section>
@@ -291,37 +311,28 @@
                 });
             }
 
-            let positionRowCount = 0;
-
             function addRowToTable(quantity, type, strike, direction = "long") {
                 const body = document.getElementById("tableBody");
-                const row = document.createElement("div");
-                row.className = "position-row row-enter";
-                const rowId = positionRowCount++;
+                const row = document.createElement("tr");
+                row.className = "row-enter";
                 row.innerHTML = `
-            <div class="position-field position-field--direction">
-                <span class="position-label" id="direction-label-${rowId}">Direction</span>
-                <div class="direction-toggle" role="group" aria-labelledby="direction-label-${rowId}">
+            <td>
+                <div class="direction-toggle" role="group" aria-label="Position direction">
                     <button type="button" class="direction-btn" data-direction="long">Long</button>
                     <button type="button" class="direction-btn" data-direction="short">Short</button>
                 </div>
-            </div>
-            <div class="position-field position-field--qty">
-                <label class="position-label" for="qty-${rowId}">Qty</label>
-                <input type="number" id="qty-${rowId}" class="quantity-input" value="${Math.abs(quantity)}" min="0" step="1" inputmode="numeric">
-            </div>
-            <div class="position-field position-field--type">
-                <label class="position-label" for="type-${rowId}">Type</label>
-                <select id="type-${rowId}" class="type-input">
+            </td>
+            <td><input type="number" class="quantity-input" value="${Math.abs(quantity)}" min="0" step="1" inputmode="numeric"></td>
+            <td>
+                <select class="type-input">
                     <option value="call" ${type === "call" ? "selected" : ""}>Call</option>
                     <option value="put" ${type === "put" ? "selected" : ""}>Put</option>
                 </select>
-            </div>
-            <div class="position-field position-field--strike">
-                <label class="position-label" for="strike-${rowId}">Strike</label>
-                <input type="number" id="strike-${rowId}" class="strike-input" value="${strike}" min="0.01" step="1" inputmode="decimal">
-            </div>
-            <button class="row-action row-action--remove" type="button" aria-label="Delete position" title="Delete position" onclick="removeRow(this.closest('.position-row'))">−</button>
+            </td>
+            <td><input type="number" class="strike-input" value="${strike}" min="0.01" step="1" inputmode="decimal"></td>
+            <td>
+                <button class="row-action row-action--remove" type="button" aria-label="Delete position" title="Delete position" onclick="removeRow(this.closest('tr'))">−</button>
+            </td>
         `;
                 body.appendChild(row);
                 setRowDirection(row, direction);
@@ -387,7 +398,7 @@
 
             function readPositions() {
                 const rows = document.querySelectorAll(
-                    "#tableBody .position-row:not(.row-leave)",
+                    "#tableBody tr:not(.row-leave)",
                 );
                 const positions = [];
                 rows.forEach((row) => {

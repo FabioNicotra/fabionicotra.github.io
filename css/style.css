@@ -329,13 +329,22 @@ section h2 {
   gap: 1.5rem;
   align-items: start;
 }
+/* Grid items default to min-width:auto, so a wide table's intrinsic
+   width blows out its track (and the page) instead of scrolling inside
+   .table-scroll -- this lets items shrink below their content's width. */
+.tool-grid > * { min-width: 0; }
 @media (max-width: 860px) {
   .tool-grid { grid-template-columns: 1fr; }
 }
-/* Positions needs the full row width for one entry per line (see
-   .position-row below) -- it can't share the narrow 1fr track with
-   Common Parameters the way the other stacked-cards pages do. */
-.tool-grid > .position-panel { grid-column: 1 / -1; }
+
+/* Portfolio pricer: chart full-width on top (it's the main output), then
+   Common Parameters and Positions as two columns below, with Positions
+   getting most of the width since it needs room for one entry per line. */
+.pricer-grid { grid-template-columns: minmax(260px, 1fr) minmax(440px, 1.7fr); }
+.pricer-grid > .chart-card { grid-column: 1 / -1; }
+@media (max-width: 860px) {
+  .pricer-grid { grid-template-columns: 1fr; }
+}
 
 .tool-loading {
   text-align: center;
@@ -375,6 +384,20 @@ section h2 {
 .data-table td:last-child { text-align: center; width: 2.5rem; }
 .data-table--params td:last-child { text-align: left; width: auto; }
 
+/* Positions: table-layout:fixed with every column given a share means
+   the extra width from the wider grid track is distributed across all
+   of them proportionally, instead of auto-layout dumping 100% of the
+   slack into whichever column has no explicit width (Direction, before
+   this) and leaving a large blank gap next to it. */
+.data-table--positions { table-layout: fixed; min-width: 480px; }
+.data-table--positions th:nth-child(1), .data-table--positions td:nth-child(1) { width: 32%; }
+.data-table--positions th:nth-child(2), .data-table--positions td:nth-child(2) { width: 14%; }
+.data-table--positions th:nth-child(3), .data-table--positions td:nth-child(3) { width: 22%; }
+.data-table--positions th:nth-child(4), .data-table--positions td:nth-child(4) { width: 20%; }
+.data-table--positions th:last-child, .data-table--positions td:last-child { width: 12%; }
+
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
 .data-table input[type="number"], .data-table input[type="text"], .data-table select {
   width: 100%;
   background: transparent;
@@ -393,8 +416,6 @@ section h2 {
 }
 .data-table input[type="number"]:hover, .data-table input[type="text"]:hover, .data-table select:hover { border-bottom-color: var(--accent-3); }
 .data-table select { color-scheme: light dark; }
-
-.stacked-cards { display: flex; flex-direction: column; gap: 1.5rem; }
 
 .row-action {
   display: inline-flex;
@@ -418,69 +439,17 @@ section h2 {
 .row-action--add { color: var(--success); }
 
 /* Row add/remove micro-animation: opacity + slight vertical slide. */
-#tableBody tr,
-#tableBody .position-row {
+#tableBody tr {
   transition: opacity 0.25s ease, transform 0.25s ease;
 }
-#tableBody tr.row-enter,
-#tableBody .position-row.row-enter {
+#tableBody tr.row-enter {
   opacity: 0;
   transform: translateY(-6px);
 }
-#tableBody tr.row-leave,
-#tableBody .position-row.row-leave {
+#tableBody tr.row-leave {
   opacity: 0;
   transform: translateY(6px);
 }
-
-/* --- Position list (portfolio pricer) ---
-   A table's columns get too narrow to read "Call"/"Put" once there are
-   4+ of them on a small screen, so positions use labeled flex fields
-   instead, which can stack vertically on mobile. */
-.position-list { display: flex; flex-direction: column; }
-.position-panel > .row-action--add { margin-top: 0.75rem; }
-.position-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 0.7rem 1rem;
-  padding: 1rem 0;
-  border-bottom: 1px solid var(--glass-border);
-  position: relative;
-}
-.position-row:last-child { border-bottom: none; padding-bottom: 0.5rem; }
-.position-field { display: flex; flex-direction: column; gap: 0.3rem; }
-.position-label {
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-}
-.position-field--qty { width: 4.5rem; }
-.position-field--type { width: 6.5rem; }
-.position-field--strike { width: 6rem; }
-
-.position-row input[type="number"],
-.position-row select {
-  width: 100%;
-  background: transparent;
-  color: var(--fg);
-  border: none;
-  border-bottom: 1.5px solid var(--glass-border);
-  border-radius: 0;
-  padding: 0.4rem 0.25rem;
-  font-family: inherit;
-  font-size: 0.95rem;
-  transition: border-color 0.2s ease, color 0.35s ease;
-}
-.position-row input[type="number"]:focus,
-.position-row select:focus {
-  outline: none;
-  border-bottom-color: var(--accent-2);
-}
-.position-row input[type="number"]:hover,
-.position-row select:hover { border-bottom-color: var(--accent-3); }
-.position-row select { color-scheme: light dark; }
 
 .direction-toggle {
   display: inline-flex;
@@ -505,24 +474,6 @@ section h2 {
 .direction-btn:hover { color: var(--fg); }
 .direction-btn.is-active[data-direction="long"] { background: var(--success); color: #fff; }
 .direction-btn.is-active[data-direction="short"] { background: var(--danger); color: #fff; }
-
-
-@media (max-width: 600px) {
-  .position-row {
-    flex-direction: column;
-    align-items: stretch;
-    padding-right: 2.2rem;
-  }
-  .position-field--qty, .position-field--type, .position-field--strike {
-    width: 100%;
-  }
-  .position-row .row-action--remove {
-    position: absolute;
-    top: 1rem;
-    right: 0;
-    margin-left: 0;
-  }
-}
 
 .tool-status {
   margin-top: 1rem;
