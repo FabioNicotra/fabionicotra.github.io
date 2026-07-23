@@ -438,6 +438,7 @@ section h2 {
    4+ of them on a small screen, so positions use labeled flex fields
    instead, which can stack vertically on mobile. */
 .position-list { display: flex; flex-direction: column; }
+.position-panel > .row-action--add { margin-top: 0.75rem; }
 .position-row {
   display: flex;
   flex-wrap: wrap;
