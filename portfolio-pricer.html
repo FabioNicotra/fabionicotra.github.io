@@ -37,93 +37,98 @@
                     <p>Loading…</p>
                 </div>
 
-                <div id="app" class="tool-grid reveal" style="display: none">
-                    <div class="stacked-cards">
-                        <div class="glass-card">
-                            <h2>Common Parameters</h2>
-                            <table class="data-table data-table--params">
-                                <thead>
-                                    <tr>
-                                        <th>Parameter</th>
-                                        <th>Value</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td>
-                                            <label for="inp-S"
-                                                >Spot price (S)</label
-                                            >
-                                        </td>
-                                        <td>
-                                            <input
-                                                type="number"
-                                                id="inp-S"
-                                                value="100"
-                                                min="0"
-                                                step="1"
-                                            />
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>
-                                            <label for="inp-r"
-                                                >Risk-free rate, %
-                                                (r)</label
-                                            >
-                                        </td>
-                                        <td>
-                                            <input
-                                                type="number"
-                                                id="inp-r"
-                                                value="4"
-                                                min="0"
-                                                step="0.1"
-                                            />
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>
-                                            <label for="inp-sigma"
-                                                >Volatility, % (σ)</label
-                                            >
-                                        </td>
-                                        <td>
-                                            <input
-                                                type="number"
-                                                id="inp-sigma"
-                                                value="20"
-                                                min="0.01"
-                                                step="0.5"
-                                            />
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>
-                                            <label for="inp-T"
-                                                >Time to maturity, years
-                                                (T)</label
-                                            >
-                                        </td>
-                                        <td>
-                                            <input
-                                                type="number"
-                                                id="inp-T"
-                                                value="1"
-                                                min="0.01"
-                                                step="0.05"
-                                            />
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
+                <div id="app" class="tool-grid pricer-grid reveal" style="display: none">
+                    <div class="glass-card chart-card chart-card--tall">
+                        <div id="plot"></div>
+                    </div>
 
-                        <div class="glass-card">
-                            <h2>Positions</h2>
-                            <table class="data-table" id="positionsTable">
+                    <div class="glass-card">
+                        <h2>Common Parameters</h2>
+                        <table class="data-table data-table--params">
+                            <thead>
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <label for="inp-S"
+                                            >Spot price (S)</label
+                                        >
+                                    </td>
+                                    <td>
+                                        <input
+                                            type="number"
+                                            id="inp-S"
+                                            value="100"
+                                            min="0"
+                                            step="1"
+                                        />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <label for="inp-r"
+                                            >Risk-free rate, %
+                                            (r)</label
+                                        >
+                                    </td>
+                                    <td>
+                                        <input
+                                            type="number"
+                                            id="inp-r"
+                                            value="4"
+                                            min="0"
+                                            step="0.1"
+                                        />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <label for="inp-sigma"
+                                            >Volatility, % (σ)</label
+                                        >
+                                    </td>
+                                    <td>
+                                        <input
+                                            type="number"
+                                            id="inp-sigma"
+                                            value="20"
+                                            min="0.01"
+                                            step="0.5"
+                                        />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <label for="inp-T"
+                                            >Time to maturity, years
+                                            (T)</label
+                                        >
+                                    </td>
+                                    <td>
+                                        <input
+                                            type="number"
+                                            id="inp-T"
+                                            value="1"
+                                            min="0.01"
+                                            step="0.05"
+                                        />
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="glass-card">
+                        <h2>Positions</h2>
+                        <div class="table-scroll">
+                            <table class="data-table data-table--positions" id="positionsTable">
                                 <thead>
                                     <tr>
+                                        <th>Direction</th>
                                         <th>Qty</th>
                                         <th>Type</th>
                                         <th>Strike</th>
@@ -133,7 +138,7 @@
                                 <tbody id="tableBody"></tbody>
                                 <tfoot>
                                     <tr>
-                                        <td colspan="3"></td>
+                                        <td colspan="4"></td>
                                         <td>
                                             <button
                                                 class="row-action row-action--add"
@@ -148,16 +153,12 @@
                                     </tr>
                                 </tfoot>
                             </table>
-                            <div
-                                id="status"
-                                class="tool-status"
-                                style="display: none"
-                            ></div>
                         </div>
-                    </div>
-
-                    <div class="glass-card chart-card chart-card--tall">
-                        <div id="plot"></div>
+                        <div
+                            id="status"
+                            class="tool-status"
+                            style="display: none"
+                        ></div>
                     </div>
                 </div>
             </section>
@@ -174,8 +175,8 @@
         <script>
             let pyodide;
             const defaultPositions = [
-                { quantity: 1, type: "call", strike: 100 },
-                { quantity: -1, type: "call", strike: 110 },
+                { quantity: 1, type: "call", strike: 100, direction: "long" },
+                { quantity: 1, type: "call", strike: 110, direction: "short" },
             ];
 
             function getChartTheme() {
@@ -293,33 +294,61 @@
                 const body = document.getElementById("tableBody");
                 body.innerHTML = "";
                 defaultPositions.forEach((p) => {
-                    addRowToTable(p.quantity, p.type, p.strike);
+                    addRowToTable(p.quantity, p.type, p.strike, p.direction);
                 });
             }
 
-            function addRowToTable(quantity, type, strike) {
+            function setRowDirection(row, direction) {
+                row.dataset.direction = direction;
+                row.querySelectorAll(".direction-btn").forEach((btn) => {
+                    const isActive = btn.dataset.direction === direction;
+                    btn.classList.toggle("is-active", isActive);
+                    btn.setAttribute("aria-pressed", String(isActive));
+                });
+            }
+
+            function addRowToTable(quantity, type, strike, direction = "long") {
                 const body = document.getElementById("tableBody");
                 const row = document.createElement("tr");
                 row.className = "row-enter";
                 row.innerHTML = `
-            <td><input type="number" class="quantity-input" value="${quantity}" step="1"></td>
+            <td>
+                <div class="direction-toggle" role="group" aria-label="Position direction">
+                    <button type="button" class="direction-btn" data-direction="long">Long</button>
+                    <button type="button" class="direction-btn" data-direction="short">Short</button>
+                </div>
+            </td>
+            <td><input type="number" class="quantity-input" value="${Math.abs(quantity)}" min="0" step="1" inputmode="numeric"></td>
             <td>
                 <select class="type-input">
                     <option value="call" ${type === "call" ? "selected" : ""}>Call</option>
                     <option value="put" ${type === "put" ? "selected" : ""}>Put</option>
                 </select>
             </td>
-            <td><input type="number" class="strike-input" value="${strike}" min="0.01" step="1"></td>
+            <td><input type="number" class="strike-input" value="${strike}" min="0.01" step="1" inputmode="decimal"></td>
             <td>
                 <button class="row-action row-action--remove" type="button" aria-label="Delete position" title="Delete position" onclick="removeRow(this.closest('tr'))">−</button>
             </td>
         `;
                 body.appendChild(row);
+                setRowDirection(row, direction);
 
-                row.querySelector(".quantity-input").addEventListener(
-                    "change",
-                    updatePlot,
-                );
+                row.querySelectorAll(".direction-btn").forEach((btn) => {
+                    btn.addEventListener("click", () => {
+                        setRowDirection(row, btn.dataset.direction);
+                        updatePlot();
+                    });
+                });
+
+                const quantityInput = row.querySelector(".quantity-input");
+                quantityInput.addEventListener("input", () => {
+                    // Direction is chosen with the toggle above, not the sign
+                    // of the number, so strip any negative the user types in.
+                    if (quantityInput.value !== "" && parseFloat(quantityInput.value) < 0) {
+                        quantityInput.value = Math.abs(parseFloat(quantityInput.value));
+                    }
+                });
+                quantityInput.addEventListener("change", updatePlot);
                 row.querySelector(".type-input").addEventListener(
                     "change",
                     updatePlot,
@@ -339,7 +368,7 @@
             }
 
             function addRow() {
-                addRowToTable(1, "call", 100);
+                addRowToTable(1, "call", 100, "long");
                 updatePlot();
             }
 
@@ -369,10 +398,14 @@
                 );
                 const positions = [];
                 rows.forEach((row) => {
+                    const magnitude = parseFloat(
+                        row.querySelector(".quantity-input").value,
+                    );
+                    const sign = row.dataset.direction === "short" ? -1 : 1;
                     positions.push({
-                        quantity: parseFloat(
-                            row.querySelector(".quantity-input").value,
-                        ),
+                        quantity: Number.isNaN(magnitude)
+                            ? magnitude
+                            : sign * magnitude,
                         type: row.querySelector(".type-input").value,
                         strike: parseFloat(
                             row.querySelector(".strike-input").value,
@@ -414,10 +447,10 @@
                     };
                 }
                 for (const p of positions) {
-                    if (Number.isNaN(p.quantity)) {
+                    if (Number.isNaN(p.quantity) || Math.abs(p.quantity) <= 0) {
                         return {
                             valid: false,
-                            error: "Every position needs a valid quantity.",
+                            error: "Every position needs a quantity greater than zero.",
                         };
                     }
                     if (Number.isNaN(p.strike) || p.strike <= 0) {

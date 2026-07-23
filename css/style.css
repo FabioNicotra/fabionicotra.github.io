@@ -309,8 +309,21 @@ section h2 {
   gap: 1.5rem;
   align-items: start;
 }
+/* Grid items default to min-width:auto, so a wide table's intrinsic
+   width blows out its track (and the page) instead of scrolling inside
+   .table-scroll -- this lets items shrink below their content's width. */
+.tool-grid > * { min-width: 0; }
 @media (max-width: 860px) {
   .tool-grid { grid-template-columns: 1fr; }
+}
+
+/* Portfolio pricer: chart full-width on top (it's the main output), then
+   Common Parameters and Positions as two columns below, with Positions
+   getting most of the width since it needs room for one entry per line. */
+.pricer-grid { grid-template-columns: minmax(260px, 1fr) minmax(440px, 1.7fr); }
+.pricer-grid > .chart-card { grid-column: 1 / -1; }
+@media (max-width: 860px) {
+  .pricer-grid { grid-template-columns: 1fr; }
 }
 
 .tool-loading {
@@ -351,6 +364,20 @@ section h2 {
 .data-table td:last-child { text-align: center; width: 2.5rem; }
 .data-table--params td:last-child { text-align: left; width: auto; }
 
+/* Positions: table-layout:fixed with every column given a share means
+   the extra width from the wider grid track is distributed across all
+   of them proportionally, instead of auto-layout dumping 100% of the
+   slack into whichever column has no explicit width (Direction, before
+   this) and leaving a large blank gap next to it. */
+.data-table--positions { table-layout: fixed; min-width: 480px; }
+.data-table--positions th:nth-child(1), .data-table--positions td:nth-child(1) { width: 32%; }
+.data-table--positions th:nth-child(2), .data-table--positions td:nth-child(2) { width: 14%; }
+.data-table--positions th:nth-child(3), .data-table--positions td:nth-child(3) { width: 22%; }
+.data-table--positions th:nth-child(4), .data-table--positions td:nth-child(4) { width: 20%; }
+.data-table--positions th:last-child, .data-table--positions td:last-child { width: 12%; }
+
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
 .data-table input[type="number"], .data-table input[type="text"], .data-table select {
   width: 100%;
   background: transparent;
@@ -369,8 +396,6 @@ section h2 {
 }
 .data-table input[type="number"]:hover, .data-table input[type="text"]:hover, .data-table select:hover { border-bottom-color: var(--accent-3); }
 .data-table select { color-scheme: light dark; }
-
-.stacked-cards { display: flex; flex-direction: column; gap: 1.5rem; }
 
 .row-action {
   display: inline-flex;
@@ -405,6 +430,30 @@ section h2 {
   opacity: 0;
   transform: translateY(6px);
 }
+
+.direction-toggle {
+  display: inline-flex;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--glass-bg) 70%, transparent);
+  border: 1px solid var(--glass-border);
+  padding: 2px;
+  gap: 2px;
+}
+.direction-btn {
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.direction-btn:hover { color: var(--fg); }
+.direction-btn.is-active[data-direction="long"] { background: var(--success); color: #fff; }
+.direction-btn.is-active[data-direction="short"] { background: var(--danger); color: #fff; }
 
 .tool-status {
   margin-top: 1rem;
