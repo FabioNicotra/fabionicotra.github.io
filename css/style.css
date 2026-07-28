@@ -297,6 +297,7 @@ section h2 {
 .prose p:last-child { margin-bottom: 0; }
 .prose em { color: var(--fg); font-style: italic; }
 .prose .work-grid { max-width: none; margin-top: 0.5rem; }
+.prose .btn { margin-top: 1.5rem; }
 .prose ul { color: var(--muted); line-height: 1.65; margin: 0; padding-left: 1.25rem; }
 .prose li { margin-bottom: 0.6rem; }
 .prose li:last-child { margin-bottom: 0; }

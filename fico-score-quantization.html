@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>FICO Score Quantization — Fabio Nicotra</title>
+        <link rel="stylesheet" href="css/style.css" />
+    </head>
+    <body>
+        <nav class="topnav">
+            <a class="brand" href="index.html">Fabio Nicotra</a>
+            <div class="topnav-links">
+                <a href="index.html#about">About</a>
+                <a href="index.html#work">Work</a>
+                <a href="index.html#skills">Skills</a>
+                <a href="index.html#contact">Contact</a>
+            </div>
+        </nav>
+
+        <main>
+            <section class="page-hero">
+                <a href="index.html#work" class="section-back">← Work</a>
+                <p class="eyebrow reveal">Optimization</p>
+                <h1 class="reveal">FICO Score Quantization</h1>
+                <p class="hero-sub reveal">
+                    Finding the optimal binning of FICO credit scores with a
+                    genetic algorithm.
+                </p>
+            </section>
+
+            <section class="content">
+                <div class="prose reveal">
+                    <h2>Overview</h2>
+                    <p>
+                        A FICO score is a standardized credit score, produced
+                        by the Fair Isaac Corporation, that rates a
+                        borrower's creditworthiness on a scale from 300 to
+                        850. It's used in around 90% of US mortgage lending
+                        decisions. The goal here is to predict a borrower's
+                        probability of default from their FICO score, while
+                        quantizing the continuous score into a small number
+                        of bins that stay easy to interpret and act on.
+                    </p>
+                </div>
+
+                <div class="prose reveal">
+                    <h2>Method</h2>
+                    <p>
+                        The bin boundaries are found with a genetic
+                        algorithm, where each gene is the value of one
+                        threshold separating two bins. The search is framed
+                        as a multi-objective optimization: the fitness
+                        function rewards the log-likelihood of the resulting
+                        partition against the observed default data, and
+                        penalizes any partition where default rates don't
+                        move monotonically across bins. Implemented in
+                        Python with <code>pandas</code>, <code>numpy</code>,
+                        and the <code>pygad</code> genetic algorithm library.
+                    </p>
+                </div>
+
+                <div class="prose reveal">
+                    <h2>Result</h2>
+                    <p>
+                        The optimal quantization found by the algorithm
+                        produces default rates that decrease monotonically
+                        as FICO score increases across every bin — a
+                        desirable property for a creditworthiness model,
+                        since it means the bins stay consistent with
+                        borrowers' actual credit risk.
+                    </p>
+                    <a href="notebooks/score_quantization.html" class="btn"
+                        >View notebook</a
+                    >
+                </div>
+            </section>
+
+            <footer class="site-footer">
+                <p>
+                    &copy; <span id="year"></span> Fabio Nicotra. All rights
+                    reserved.
+                </p>
+            </footer>
+        </main>
+
+        <script src="js/main.js"></script>
+    </body>
+</html>
