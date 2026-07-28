@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Natural Gas Price Forecast — Fabio Nicotra</title>
+        <link rel="stylesheet" href="css/style.css" />
+    </head>
+    <body>
+        <nav class="topnav">
+            <a class="brand" href="index.html">Fabio Nicotra</a>
+            <div class="topnav-links">
+                <a href="index.html#about">About</a>
+                <a href="index.html#work">Work</a>
+                <a href="index.html#skills">Skills</a>
+                <a href="index.html#contact">Contact</a>
+            </div>
+        </nav>
+
+        <main>
+            <section class="page-hero">
+                <a href="index.html#work" class="section-back">← Work</a>
+                <p class="eyebrow reveal">Forecasting</p>
+                <h1 class="reveal">Natural Gas Price Forecast</h1>
+                <p class="hero-sub reveal">
+                    Modeling trend and seasonality in natural gas prices to
+                    produce a 12-month forward forecast.
+                </p>
+            </section>
+
+            <section class="content">
+                <div class="prose reveal">
+                    <h2>Overview</h2>
+                    <p>
+                        Given monthly historical natural gas price data, the
+                        goal is to estimate the purchase price at any date —
+                        past or future. Prices between two points in the
+                        historical record are estimated by linear
+                        interpolation. Prices for the year ahead are
+                        extrapolated from the trend and seasonality of the
+                        historical data.
+                    </p>
+                </div>
+
+                <div class="prose reveal">
+                    <h2>Method</h2>
+                    <p>
+                        The trend is estimated with a 12-month moving
+                        average, which turns out to be approximately linear.
+                        Trend and seasonality are then modeled jointly with
+                        a linear regression combined with a Fourier series.
+                        The order of the Fourier series is chosen by trading
+                        off the model's RMSE against the p-value of a
+                        Shapiro-Wilk test on the residuals — as the order
+                        increases, RMSE keeps falling but the residuals drift
+                        further from normal, so an order of 6 was chosen as
+                        the balance point. Built in Python with
+                        <code>pandas</code>, <code>matplotlib</code>, and
+                        <code>scipy.stats</code>.
+                    </p>
+                </div>
+
+                <div class="prose reveal">
+                    <h2>Result</h2>
+                    <p>
+                        Historical and forecast values are combined into a
+                        single series and interpolated to daily frequency.
+                        Past-date estimates simply read off this interpolated
+                        series. Future estimates come from the fitted model,
+                        with a 3-sigma confidence interval derived from the
+                        historical residuals, under the simplifying
+                        assumption that their variance stays constant over
+                        time.
+                    </p>
+                    <a href="notebooks/natural_gas.html" class="btn"
+                        >View notebook</a
+                    >
+                </div>
+            </section>
+
+            <footer class="site-footer">
+                <p>
+                    &copy; <span id="year"></span> Fabio Nicotra. All rights
+                    reserved.
+                </p>
+            </footer>
+        </main>
+
+        <script src="js/main.js"></script>
+    </body>
+</html>
