@@ -1,5 +1,5 @@
 import micropip
-await micropip.install("numanlib")
+await micropip.install("numanlib==0.2.1")
 
 import json
 import math
