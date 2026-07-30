@@ -1,15 +1,19 @@
 import micropip
-await micropip.install("fiqua==0.1.0")
+await micropip.install("fiqua==0.2.0")
 
 import json
 import numpy as np
-from fiqua.equities import Stock, EuropeanOption, portfolio_surface
 from fiqua.core import Portfolio
+from fiqua.equities import BlackScholesPDEEngine, EuropeanOption, MarketData, Metric, PricingRequest, Stock, StockQuote
+
+UNDERLYING_SYMBOL = "UNDERLYING"
 
 
 def price_portfolio(positions, spot, r, sigma, T):
     try:
-        stock = Stock(spot=spot, rate=r, volatility=sigma)
+        stock = Stock(UNDERLYING_SYMBOL)
+        market = MarketData(rate=r, quotes={UNDERLYING_SYMBOL: StockQuote(spot=spot, volatility=sigma)})
+        engine = BlackScholesPDEEngine(market=market)
         legs = [
             (
                 EuropeanOption(
@@ -23,12 +27,19 @@ def price_portfolio(positions, spot, r, sigma, T):
             for p in positions
         ]
         portfolio = Portfolio(positions=legs)
-        result = portfolio_surface(portfolio)
+        engine.add([PricingRequest(instrument=portfolio, metrics=[Metric.PV])])
+        pv_result = engine.run()[0]
     except (ValueError, TypeError) as e:
         return {"success": False, "error": str(e)}
 
-    if not result.solved:
-        return {"success": False, "error": result.error_msg}
+    pv_metadata = pv_result.metadata.get("pv", {})
+    if not pv_result.priced or "parabolic_result" not in pv_metadata:
+        return {
+            "success": False,
+            "error": pv_result.error_msg or "Portfolio does not support a shared pricing surface.",
+        }
+
+    result = pv_metadata["parabolic_result"]
 
     grid_S = result.grid_x
     grid_t_full = result.grid_t
