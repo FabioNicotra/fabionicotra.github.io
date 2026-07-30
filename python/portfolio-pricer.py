@@ -1,5 +1,5 @@
 import micropip
-await micropip.install("fiqua")
+await micropip.install("fiqua==0.1.0")
 
 import json
 import numpy as np
