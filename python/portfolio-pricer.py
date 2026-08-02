@@ -1,5 +1,5 @@
 import micropip
-await micropip.install("fiqua==0.2.0")
+await micropip.install("fiqua==0.2.2")
 
 import json
 import numpy as np
@@ -27,7 +27,7 @@ def price_portfolio(positions, spot, r, sigma, T):
             for p in positions
         ]
         portfolio = Portfolio(positions=legs)
-        engine.add([PricingRequest(instrument=portfolio, metrics=[Metric.PV])])
+        engine.add([PricingRequest(instrument=portfolio, metrics=[Metric.PV, Metric.DELTA])])
         priced = engine.run()[0]
     except (ValueError, TypeError) as e:
         return {"success": False, "error": str(e)}
@@ -69,15 +69,22 @@ def price_portfolio(positions, spot, r, sigma, T):
     grid_t = [float(grid_t_full[j]) for j in idx]
     value_grid = [result.solution[:, j].tolist() for j in idx]
 
-    # fiqua 0.2.0 doesn't expose a delta metric yet, but the PDE already
-    # solved the full value surface over S -- differentiating that surface
-    # w.r.t. S gives delta directly, no extra pricing call needed. Swap
-    # this for the engine's native Metric.DELTA once that ships.
+    # fiqua's Metric.DELTA only gives a scalar delta at the market's own
+    # spot -- there's no public API for a delta curve across a whole range
+    # of spots, and re-solving the PDE at every grid point just to plot a
+    # curve would be far too slow for the browser. The PDE already solved
+    # the full value surface over S, though, so differentiating that
+    # surface w.r.t. S gives the delta curve directly, no extra pricing
+    # calls needed.
     delta_surface = np.gradient(result.solution, grid_S, axis=0)
     delta_grid = [delta_surface[:, j].tolist() for j in idx]
 
-    spot_value = float(np.interp(spot, grid_S, result.solution[:, 0]))
-    spot_delta = float(np.interp(spot, grid_S, delta_surface[:, 0]))
+    # Spot price/delta come straight from fiqua's own metrics rather than
+    # this file re-deriving them from the grid -- more accurate (fiqua
+    # spline-interpolates PV and bumps-and-reprices delta at the exact
+    # spot) and the whole point of requesting Metric.DELTA above.
+    spot_value = float(priced.values[Metric.PV])
+    spot_delta = float(priced.values[Metric.DELTA])
     spot_payoff = sum(pos.quantity * pos.instrument.payoff(spot) for pos in portfolio.positions)
 
     return {
