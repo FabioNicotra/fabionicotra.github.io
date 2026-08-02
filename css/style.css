@@ -322,10 +322,43 @@ section h2 {
    Common Parameters and Positions as two columns below, with Positions
    getting most of the width since it needs room for one entry per line. */
 .pricer-grid { grid-template-columns: minmax(260px, 1fr) minmax(440px, 1.7fr); }
-.pricer-grid > .chart-card { grid-column: 1 / -1; }
+.pricer-grid > .chart-card,
+.pricer-grid > .spot-metrics-card { grid-column: 1 / -1; }
 @media (max-width: 860px) {
   .pricer-grid { grid-template-columns: 1fr; }
 }
+
+/* Spot metrics: row of stat tiles for the metrics priced at the current
+   spot (price, delta, and whatever fiqua exposes next -- auto-fit keeps
+   this readable as tiles are added). */
+.spot-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+}
+.metric-tile {
+  padding: 0.9rem 1.1rem;
+  text-align: center;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--glass-bg) 70%, transparent);
+  border: 1px solid var(--glass-border);
+}
+.metric-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent-2);
+  font-weight: 600;
+  margin: 0 0 0.4rem;
+}
+.metric-value {
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: var(--fg);
+  margin: 0;
+  transition: color 0.35s ease;
+}
+.metric-value.is-unavailable { font-size: 1rem; font-weight: 500; color: var(--muted); }
 
 .tool-loading {
   text-align: center;
@@ -455,6 +488,32 @@ section h2 {
 .direction-btn:hover { color: var(--fg); }
 .direction-btn.is-active[data-direction="long"] { background: var(--success); color: #fff; }
 .direction-btn.is-active[data-direction="short"] { background: var(--danger); color: #fff; }
+
+/* Chart curve toggle: same pill-group pattern as direction-toggle above,
+   but neutral (accent-2) since Value/Delta aren't a long/short pair. */
+.view-toggle {
+  display: inline-flex;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--glass-bg) 70%, transparent);
+  border: 1px solid var(--glass-border);
+  padding: 2px;
+  gap: 2px;
+  margin-bottom: 0.9rem;
+}
+.view-toggle-btn {
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.view-toggle-btn:hover { color: var(--fg); }
+.view-toggle-btn.is-active { background: var(--accent-2); color: #fff; }
 
 .tool-status {
   margin-top: 1rem;

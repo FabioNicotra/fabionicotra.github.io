@@ -39,7 +39,25 @@
 
                 <div id="app" class="tool-grid pricer-grid reveal" style="display: none">
                     <div class="glass-card chart-card chart-card--tall">
+                        <div class="view-toggle" role="group" aria-label="Curve">
+                            <button type="button" class="view-toggle-btn is-active" data-view="value">Value</button>
+                            <button type="button" class="view-toggle-btn" data-view="delta">Delta</button>
+                        </div>
                         <div id="plot"></div>
+                    </div>
+
+                    <div class="glass-card spot-metrics-card">
+                        <h2>At Spot</h2>
+                        <div class="spot-metrics">
+                            <div class="metric-tile">
+                                <p class="metric-label">Price</p>
+                                <p class="metric-value" id="metric-price">—</p>
+                            </div>
+                            <div class="metric-tile">
+                                <p class="metric-label">Delta</p>
+                                <p class="metric-value" id="metric-delta">—</p>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="glass-card">
@@ -174,6 +192,9 @@
         <script src="js/main.js"></script>
         <script>
             let pyodide;
+            let currentView = "value";
+            let lastCommon = null;
+            let lastData = null;
             const defaultPositions = [
                 { quantity: 1, type: "call", strike: 100, direction: "long" },
                 { quantity: 1, type: "call", strike: 110, direction: "short" },
@@ -208,6 +229,7 @@
                 document.getElementById("app").style.display = "grid";
 
                 initializeTable();
+                initializeViewToggle();
                 await updatePlot();
 
                 ["inp-S", "inp-r", "inp-sigma", "inp-T"].forEach((id) => {
@@ -219,8 +241,21 @@
                 window
                     .matchMedia("(prefers-color-scheme: dark)")
                     .addEventListener("change", () => {
-                        updatePlot();
+                        if (lastData) renderChart(lastCommon, lastData, currentView);
                     });
+            }
+
+            function initializeViewToggle() {
+                document.querySelectorAll(".view-toggle-btn").forEach((btn) => {
+                    btn.addEventListener("click", () => {
+                        if (btn.classList.contains("is-active")) return;
+                        document
+                            .querySelectorAll(".view-toggle-btn")
+                            .forEach((b) => b.classList.toggle("is-active", b === btn));
+                        currentView = btn.dataset.view;
+                        if (lastData) renderChart(lastCommon, lastData, currentView);
+                    });
+                });
             }
 
             function initializeTable() {
@@ -396,6 +431,14 @@
                 return { valid: true };
             }
 
+            function setMetricsUnavailable() {
+                ["metric-price", "metric-delta"].forEach((id) => {
+                    const el = document.getElementById(id);
+                    el.textContent = "—";
+                    el.classList.add("is-unavailable");
+                });
+            }
+
             async function updatePlot() {
                 if (!pyodide) return;
 
@@ -408,6 +451,7 @@
                     statusEl.textContent = check.error;
                     statusEl.classList.add("error");
                     statusEl.style.display = "block";
+                    setMetricsUnavailable();
                     return;
                 }
 
@@ -428,17 +472,26 @@
                     statusEl.textContent = data.error;
                     statusEl.classList.add("error");
                     statusEl.style.display = "block";
+                    setMetricsUnavailable();
                     return;
                 }
 
-                statusEl.textContent = `Value at S=${common.spot}: ${data.spot_value.toFixed(4)} (payoff ${data.spot_payoff.toFixed(4)})`;
+                statusEl.style.display = "none";
                 statusEl.classList.remove("error");
-                statusEl.style.display = "block";
 
-                renderChart(common, data);
+                const priceEl = document.getElementById("metric-price");
+                const deltaEl = document.getElementById("metric-delta");
+                priceEl.textContent = data.spot_value.toFixed(4);
+                deltaEl.textContent = data.spot_delta.toFixed(4);
+                priceEl.classList.remove("is-unavailable");
+                deltaEl.classList.remove("is-unavailable");
+
+                lastCommon = common;
+                lastData = data;
+                renderChart(common, data, currentView);
             }
 
-            function renderChart(common, data) {
+            function renderChart(common, data, view) {
                 const theme = getChartTheme();
 
                 // portfolio_surface() solves on [0, 3x max(strike, spot)] --
@@ -457,34 +510,8 @@
                     let end = arr.findIndex((s) => s > displayMax);
                     return end === -1 ? arr.length : end;
                 };
-                const payoffEnd = sliceAt(data.fine_grid_S);
                 const valueEnd = sliceAt(data.grid_S);
-
-                const fineS = data.fine_grid_S.slice(0, payoffEnd);
-                const payoffCurve = data.payoff_curve.slice(0, payoffEnd);
                 const S = data.grid_S.slice(0, valueEnd);
-                const valueFrames = data.value_grid.map((row) =>
-                    row.slice(0, valueEnd),
-                );
-
-                const payoffTrace = {
-                    x: fineS,
-                    y: payoffCurve,
-                    mode: "lines",
-                    name: "Payoff at expiry",
-                    line: { color: theme.danger, width: 1.25, dash: "solid" },
-                    hovertemplate:
-                        "S = %{x:.2f}<br>payoff = %{y:.4f}<extra></extra>",
-                };
-                const valueTrace = {
-                    x: S,
-                    y: valueFrames[0],
-                    mode: "lines",
-                    name: "Portfolio value",
-                    line: { color: theme.value, width: 3 },
-                    hovertemplate:
-                        "S = %{x:.2f}<br>value = %{y:.4f}<extra></extra>",
-                };
 
                 const shapes = [
                     {
@@ -499,15 +526,6 @@
                     },
                 ];
 
-                // Payoff (trace 0) never changes with time, so frames only
-                // update the portfolio-value trace (1) as the slider scrubs
-                // from today (t=0) to expiry (t=T).
-                const frames = data.grid_t.map((t, k) => ({
-                    name: `t${k}`,
-                    data: [{ y: valueFrames[k] }],
-                    traces: [1],
-                }));
-
                 const steps = data.grid_t.map((t, k) => ({
                     label: t.toFixed(2),
                     method: "animate",
@@ -521,19 +539,9 @@
                     ],
                 }));
 
-                const layout = {
-                    title: {
-                        text: "Portfolio Value & Payoff vs. Spot Price",
-                        font: { color: theme.font },
-                    },
+                const baseLayout = {
                     xaxis: {
                         title: "Spot price S",
-                        gridcolor: theme.grid,
-                        color: theme.font,
-                        zerolinecolor: theme.grid,
-                    },
-                    yaxis: {
-                        title: "Value / payoff",
                         gridcolor: theme.grid,
                         color: theme.font,
                         zerolinecolor: theme.grid,
@@ -572,14 +580,98 @@
                     margin: { l: 60, r: 30, t: 50, b: 150 },
                 };
 
-                Plotly.newPlot(
-                    "plot",
-                    [payoffTrace, valueTrace],
-                    layout,
-                    { responsive: true },
-                ).then((gd) => {
-                    Plotly.addFrames(gd, frames);
-                });
+                let traces, frames, layout;
+
+                if (view === "delta") {
+                    // Single dynamic trace (index 0) this time -- no
+                    // payoff-at-expiry analog to plot alongside it.
+                    const deltaFrames = data.delta_grid.map((row) =>
+                        row.slice(0, valueEnd),
+                    );
+                    const deltaTrace = {
+                        x: S,
+                        y: deltaFrames[0],
+                        mode: "lines",
+                        name: "Portfolio delta",
+                        line: { color: theme.value, width: 3 },
+                        hovertemplate:
+                            "S = %{x:.2f}<br>delta = %{y:.4f}<extra></extra>",
+                    };
+                    traces = [deltaTrace];
+                    frames = data.grid_t.map((t, k) => ({
+                        name: `t${k}`,
+                        data: [{ y: deltaFrames[k] }],
+                        traces: [0],
+                    }));
+                    layout = {
+                        ...baseLayout,
+                        title: {
+                            text: "Portfolio Delta vs. Spot Price",
+                            font: { color: theme.font },
+                        },
+                        yaxis: {
+                            title: "Delta",
+                            gridcolor: theme.grid,
+                            color: theme.font,
+                            zerolinecolor: theme.grid,
+                        },
+                    };
+                } else {
+                    const payoffEnd = sliceAt(data.fine_grid_S);
+                    const fineS = data.fine_grid_S.slice(0, payoffEnd);
+                    const payoffCurve = data.payoff_curve.slice(0, payoffEnd);
+                    const valueFrames = data.value_grid.map((row) =>
+                        row.slice(0, valueEnd),
+                    );
+
+                    const payoffTrace = {
+                        x: fineS,
+                        y: payoffCurve,
+                        mode: "lines",
+                        name: "Payoff at expiry",
+                        line: { color: theme.danger, width: 1.25, dash: "solid" },
+                        hovertemplate:
+                            "S = %{x:.2f}<br>payoff = %{y:.4f}<extra></extra>",
+                    };
+                    const valueTrace = {
+                        x: S,
+                        y: valueFrames[0],
+                        mode: "lines",
+                        name: "Portfolio value",
+                        line: { color: theme.value, width: 3 },
+                        hovertemplate:
+                            "S = %{x:.2f}<br>value = %{y:.4f}<extra></extra>",
+                    };
+
+                    // Payoff (trace 0) never changes with time, so frames
+                    // only update the portfolio-value trace (1) as the
+                    // slider scrubs from today (t=0) to expiry (t=T).
+                    traces = [payoffTrace, valueTrace];
+                    frames = data.grid_t.map((t, k) => ({
+                        name: `t${k}`,
+                        data: [{ y: valueFrames[k] }],
+                        traces: [1],
+                    }));
+                    layout = {
+                        ...baseLayout,
+                        title: {
+                            text: "Portfolio Value & Payoff vs. Spot Price",
+                            font: { color: theme.font },
+                        },
+                        yaxis: {
+                            title: "Value / payoff",
+                            gridcolor: theme.grid,
+                            color: theme.font,
+                            zerolinecolor: theme.grid,
+                        },
+                    };
+                }
+
+                Plotly.newPlot("plot", traces, layout, { responsive: true }).then(
+                    (gd) => {
+                        Plotly.addFrames(gd, frames);
+                    },
+                );
             }
 
             initializePyodide().catch((err) => {
