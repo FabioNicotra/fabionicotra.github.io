@@ -28,15 +28,15 @@ def price_portfolio(positions, spot, r, sigma, T):
         ]
         portfolio = Portfolio(positions=legs)
         engine.add([PricingRequest(instrument=portfolio, metrics=[Metric.PV])])
-        pv_result = engine.run()[0]
+        priced = engine.run()[0]
     except (ValueError, TypeError) as e:
         return {"success": False, "error": str(e)}
 
-    pv_metadata = pv_result.metadata.get("pv", {})
-    if not pv_result.priced or "parabolic_result" not in pv_metadata:
+    pv_metadata = priced.metadata.get("pv", {})
+    if not priced.priced or "parabolic_result" not in pv_metadata:
         return {
             "success": False,
-            "error": pv_result.error_msg or "Portfolio does not support a shared pricing surface.",
+            "error": priced.error_msg or "Portfolio does not support a shared pricing surface.",
         }
 
     result = pv_metadata["parabolic_result"]
@@ -69,7 +69,15 @@ def price_portfolio(positions, spot, r, sigma, T):
     grid_t = [float(grid_t_full[j]) for j in idx]
     value_grid = [result.solution[:, j].tolist() for j in idx]
 
+    # fiqua 0.2.0 doesn't expose a delta metric yet, but the PDE already
+    # solved the full value surface over S -- differentiating that surface
+    # w.r.t. S gives delta directly, no extra pricing call needed. Swap
+    # this for the engine's native Metric.DELTA once that ships.
+    delta_surface = np.gradient(result.solution, grid_S, axis=0)
+    delta_grid = [delta_surface[:, j].tolist() for j in idx]
+
     spot_value = float(np.interp(spot, grid_S, result.solution[:, 0]))
+    spot_delta = float(np.interp(spot, grid_S, delta_surface[:, 0]))
     spot_payoff = sum(pos.quantity * pos.instrument.payoff(spot) for pos in portfolio.positions)
 
     return {
@@ -79,7 +87,9 @@ def price_portfolio(positions, spot, r, sigma, T):
         "payoff_curve": payoff_curve,
         "grid_t": grid_t,
         "value_grid": value_grid,
+        "delta_grid": delta_grid,
         "S_max": S_max,
         "spot_value": spot_value,
+        "spot_delta": spot_delta,
         "spot_payoff": spot_payoff,
     }
