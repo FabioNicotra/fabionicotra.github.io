@@ -48,8 +48,12 @@ def price_portfolio(positions, spot, r, sigma, T):
     # Payoff is pure arithmetic (no PDE involved), so evaluate it on a much
     # finer grid than the PDE's -- the PDE grid (m=100 by default) is coarse
     # enough that payoff's kinks look jagged, unlike the value curve, which
-    # is smooth by construction and doesn't need this.
-    fine_grid_S = np.linspace(0.0, S_max, 400)
+    # is smooth by construction and doesn't need this. Strikes are folded
+    # into the grid explicitly (union1d sorts + dedupes) so each kink lands
+    # exactly on an evaluated point instead of being rounded off to
+    # whichever linspace point happens to land nearby.
+    strikes = [p["strike"] for p in positions]
+    fine_grid_S = np.union1d(np.linspace(0.0, S_max, 400), strikes)
     payoff_curve = [
         sum(pos.quantity * pos.instrument.payoff(float(s)) for pos in portfolio.positions)
         for s in fine_grid_S
