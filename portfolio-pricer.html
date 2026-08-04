@@ -42,6 +42,8 @@
                         <div class="view-toggle" role="group" aria-label="Curve">
                             <button type="button" class="view-toggle-btn is-active" data-view="value">Value</button>
                             <button type="button" class="view-toggle-btn" data-view="delta">Delta</button>
+                            <button type="button" class="view-toggle-btn" data-view="gamma">Gamma</button>
+                            <button type="button" class="view-toggle-btn" data-view="theta">Theta</button>
                         </div>
                         <div id="plot"></div>
                     </div>
@@ -56,6 +58,14 @@
                             <div class="metric-tile">
                                 <p class="metric-label">Delta</p>
                                 <p class="metric-value" id="metric-delta">—</p>
+                            </div>
+                            <div class="metric-tile">
+                                <p class="metric-label">Gamma</p>
+                                <p class="metric-value" id="metric-gamma">—</p>
+                            </div>
+                            <div class="metric-tile">
+                                <p class="metric-label">Theta</p>
+                                <p class="metric-value" id="metric-theta">—</p>
                             </div>
                         </div>
                     </div>
@@ -195,6 +205,42 @@
             let currentView = "value";
             let lastCommon = null;
             let lastData = null;
+
+            const SPOT_METRICS = [
+                { id: "metric-price", key: "spot_value" },
+                { id: "metric-delta", key: "spot_delta" },
+                { id: "metric-gamma", key: "spot_gamma" },
+                { id: "metric-theta", key: "spot_theta" },
+            ];
+
+            const CURVE_VIEWS = {
+                value: {
+                    dataKey: "value_grid",
+                    label: "Portfolio value",
+                    yTitle: "Value / payoff",
+                    title: "Portfolio Value & Payoff vs. Spot Price",
+                    showPayoff: true,
+                },
+                delta: {
+                    dataKey: "delta_grid",
+                    label: "Portfolio delta",
+                    yTitle: "Delta",
+                    title: "Portfolio Delta vs. Spot Price",
+                },
+                gamma: {
+                    dataKey: "gamma_grid",
+                    label: "Portfolio gamma",
+                    yTitle: "Gamma",
+                    title: "Portfolio Gamma vs. Spot Price",
+                },
+                theta: {
+                    dataKey: "theta_grid",
+                    label: "Portfolio theta",
+                    yTitle: "Theta",
+                    title: "Portfolio Theta vs. Spot Price",
+                },
+            };
+
             const defaultPositions = [
                 { quantity: 1, type: "call", strike: 100, direction: "long" },
                 { quantity: 1, type: "call", strike: 110, direction: "short" },
@@ -432,7 +478,7 @@
             }
 
             function setMetricsUnavailable() {
-                ["metric-price", "metric-delta"].forEach((id) => {
+                SPOT_METRICS.forEach(({ id }) => {
                     const el = document.getElementById(id);
                     el.textContent = "—";
                     el.classList.add("is-unavailable");
@@ -479,12 +525,11 @@
                 statusEl.style.display = "none";
                 statusEl.classList.remove("error");
 
-                const priceEl = document.getElementById("metric-price");
-                const deltaEl = document.getElementById("metric-delta");
-                priceEl.textContent = data.spot_value.toFixed(4);
-                deltaEl.textContent = data.spot_delta.toFixed(4);
-                priceEl.classList.remove("is-unavailable");
-                deltaEl.classList.remove("is-unavailable");
+                SPOT_METRICS.forEach(({ id, key }) => {
+                    const el = document.getElementById(id);
+                    el.textContent = data[key].toFixed(4);
+                    el.classList.remove("is-unavailable");
+                });
 
                 lastCommon = common;
                 lastData = data;
@@ -580,92 +625,65 @@
                     margin: { l: 60, r: 30, t: 50, b: 150 },
                 };
 
-                let traces, frames, layout;
+                const viewConfig = CURVE_VIEWS[view];
+                const metricFrames = data[viewConfig.dataKey].map((row) =>
+                    row.slice(0, valueEnd),
+                );
+                const metricTrace = {
+                    x: S,
+                    y: metricFrames[0],
+                    mode: "lines",
+                    name: viewConfig.label,
+                    line: { color: theme.value, width: 3 },
+                    hovertemplate: `S = %{x:.2f}<br>${view} = %{y:.4f}<extra></extra>`,
+                };
 
-                if (view === "delta") {
-                    // Single dynamic trace (index 0) this time -- no
-                    // payoff-at-expiry analog to plot alongside it.
-                    const deltaFrames = data.delta_grid.map((row) =>
-                        row.slice(0, valueEnd),
-                    );
-                    const deltaTrace = {
-                        x: S,
-                        y: deltaFrames[0],
-                        mode: "lines",
-                        name: "Portfolio delta",
-                        line: { color: theme.value, width: 3 },
-                        hovertemplate:
-                            "S = %{x:.2f}<br>delta = %{y:.4f}<extra></extra>",
-                    };
-                    traces = [deltaTrace];
-                    frames = data.grid_t.map((t, k) => ({
-                        name: `t${k}`,
-                        data: [{ y: deltaFrames[k] }],
-                        traces: [0],
-                    }));
-                    layout = {
-                        ...baseLayout,
-                        title: {
-                            text: "Portfolio Delta vs. Spot Price",
-                            font: { color: theme.font },
-                        },
-                        yaxis: {
-                            title: "Delta",
-                            gridcolor: theme.grid,
-                            color: theme.font,
-                            zerolinecolor: theme.grid,
-                        },
-                    };
-                } else {
+                let traces, frames;
+
+                if (viewConfig.showPayoff) {
+                    // Payoff never changes with time, so frames only update
+                    // the metric trace (index 1, after payoff) as the
+                    // slider scrubs from today (t=0) to expiry (t=T).
                     const payoffEnd = sliceAt(data.fine_grid_S);
-                    const fineS = data.fine_grid_S.slice(0, payoffEnd);
-                    const payoffCurve = data.payoff_curve.slice(0, payoffEnd);
-                    const valueFrames = data.value_grid.map((row) =>
-                        row.slice(0, valueEnd),
-                    );
-
                     const payoffTrace = {
-                        x: fineS,
-                        y: payoffCurve,
+                        x: data.fine_grid_S.slice(0, payoffEnd),
+                        y: data.payoff_curve.slice(0, payoffEnd),
                         mode: "lines",
                         name: "Payoff at expiry",
                         line: { color: theme.danger, width: 1.25, dash: "solid" },
                         hovertemplate:
                             "S = %{x:.2f}<br>payoff = %{y:.4f}<extra></extra>",
                     };
-                    const valueTrace = {
-                        x: S,
-                        y: valueFrames[0],
-                        mode: "lines",
-                        name: "Portfolio value",
-                        line: { color: theme.value, width: 3 },
-                        hovertemplate:
-                            "S = %{x:.2f}<br>value = %{y:.4f}<extra></extra>",
-                    };
-
-                    // Payoff (trace 0) never changes with time, so frames
-                    // only update the portfolio-value trace (1) as the
-                    // slider scrubs from today (t=0) to expiry (t=T).
-                    traces = [payoffTrace, valueTrace];
+                    traces = [payoffTrace, metricTrace];
                     frames = data.grid_t.map((t, k) => ({
                         name: `t${k}`,
-                        data: [{ y: valueFrames[k] }],
+                        data: [{ y: metricFrames[k] }],
                         traces: [1],
                     }));
-                    layout = {
-                        ...baseLayout,
-                        title: {
-                            text: "Portfolio Value & Payoff vs. Spot Price",
-                            font: { color: theme.font },
-                        },
-                        yaxis: {
-                            title: "Value / payoff",
-                            gridcolor: theme.grid,
-                            color: theme.font,
-                            zerolinecolor: theme.grid,
-                        },
-                    };
+                } else {
+                    // Single dynamic trace (index 0) -- no payoff-at-expiry
+                    // analog to plot alongside a Greek.
+                    traces = [metricTrace];
+                    frames = data.grid_t.map((t, k) => ({
+                        name: `t${k}`,
+                        data: [{ y: metricFrames[k] }],
+                        traces: [0],
+                    }));
                 }
+
+                const layout = {
+                    ...baseLayout,
+                    title: {
+                        text: viewConfig.title,
+                        font: { color: theme.font },
+                    },
+                    yaxis: {
+                        title: viewConfig.yTitle,
+                        gridcolor: theme.grid,
+                        color: theme.font,
+                        zerolinecolor: theme.grid,
+                    },
+                };
 
                 Plotly.newPlot("plot", traces, layout, { responsive: true }).then(
                     (gd) => {
