@@ -328,37 +328,53 @@ section h2 {
   .pricer-grid { grid-template-columns: 1fr; }
 }
 
-/* Spot metrics: row of stat tiles for the metrics priced at the current
-   spot (price, delta, and whatever fiqua exposes next -- auto-fit keeps
-   this readable as tiles are added). */
+/* Price & Greeks: a compact row list (label left, value right, hairline
+   dividers between rows) rather than a grid of equal-weight tiles --
+   Price is the headline number, Delta/Gamma/Theta are risk sensitivities
+   on it, not peers of it. Capped width so it reads as a tidy list inside
+   the full-width card instead of stretching thin across it. */
 .spot-metrics {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  display: flex;
+  flex-direction: column;
+  max-width: 420px;
+}
+.metric-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
   gap: 1rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--glass-border);
 }
-.metric-tile {
-  padding: 0.9rem 1.1rem;
-  text-align: center;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--glass-bg) 70%, transparent);
-  border: 1px solid var(--glass-border);
-}
+.metric-row:last-child { border-bottom: none; }
 .metric-label {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--accent-2);
-  font-weight: 600;
-  margin: 0 0 0.4rem;
+  font-size: 0.92rem;
+  color: var(--muted);
 }
 .metric-value {
-  font-size: 1.6rem;
+  font-size: 1.05rem;
   font-weight: 600;
   color: var(--fg);
-  margin: 0;
+  font-variant-numeric: tabular-nums;
   transition: color 0.35s ease;
 }
-.metric-value.is-unavailable { font-size: 1rem; font-weight: 500; color: var(--muted); }
+.metric-value.is-unavailable { color: var(--muted); font-weight: 500; }
+
+/* The one row that gets the accent -- larger and bolder, same ink as the
+   rest -- so it reads as the headline the Greeks are all measured
+   relative to, without a stray color turning it into a different kind of
+   thing entirely. */
+.metric-row--primary .metric-label { color: var(--fg); font-weight: 600; }
+.metric-row--primary .metric-value {
+  font-size: 1.7rem;
+  font-weight: 700;
+}
+
+/* Price is the headline number; Delta/Gamma/Theta are risk sensitivities
+   on it, not peers of it -- only the primary tile gets the site's accent
+   color, so the Greeks stay visually secondary rather than competing. */
+.metric-tile--primary .metric-label { color: var(--accent-2); }
+.metric-tile--primary .metric-value { color: var(--accent-2); font-weight: 700; }
 
 .tool-loading {
   text-align: center;
