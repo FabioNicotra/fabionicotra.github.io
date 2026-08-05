@@ -273,6 +273,7 @@
             let pyodide;
             let currentView = "value";
             let alignGridToStrikes = true;
+            let currentFrameIndex = 0;
             let lastCommon = null;
             let lastData = null;
 
@@ -690,6 +691,22 @@
                 renderChart(common, data, currentView);
             }
 
+            // Padded [min, max] over one or more value arrays -- shared by
+            // every frame's y-axis range below, so the axis fits whatever
+            // is on screen at that time step instead of a single fixed
+            // range sized for frame 0.
+            function computeYRange(...valueArrays) {
+                const values = [].concat(...valueArrays);
+                const min = Math.min(...values);
+                const max = Math.max(...values);
+                if (min === max) {
+                    const pad = Math.abs(min) * 0.1 || 1;
+                    return [min - pad, max + pad];
+                }
+                const pad = (max - min) * 0.08;
+                return [min - pad, max + pad];
+            }
+
             function renderChart(common, data, view) {
                 const theme = getChartTheme();
 
@@ -712,6 +729,12 @@
                 const valueEnd = sliceAt(data.grid_S);
                 const S = data.grid_S.slice(0, valueEnd);
 
+                // Same time index the slider was left at, whichever view or
+                // dataset produced it -- clamped in case a grid-settings
+                // change resolved to fewer time steps than before.
+                const frameIndex = Math.min(currentFrameIndex, data.grid_t.length - 1);
+                currentFrameIndex = frameIndex;
+
                 const shapes = [
                     {
                         type: "line",
@@ -725,17 +748,18 @@
                     },
                 ];
 
+                // Smooth, non-zero durations so both the curve and the
+                // y-axis range animate into place as the slider moves,
+                // instead of snapping.
+                const animationOpts = {
+                    mode: "immediate",
+                    transition: { duration: 250, easing: "cubic-in-out" },
+                    frame: { duration: 250, redraw: true },
+                };
                 const steps = data.grid_t.map((t, k) => ({
                     label: t.toFixed(2),
                     method: "animate",
-                    args: [
-                        [`t${k}`],
-                        {
-                            mode: "immediate",
-                            transition: { duration: 0 },
-                            frame: { duration: 0, redraw: true },
-                        },
-                    ],
+                    args: [[`t${k}`], animationOpts],
                 }));
 
                 const baseLayout = {
@@ -759,7 +783,7 @@
                     },
                     sliders: [
                         {
-                            active: 0,
+                            active: frameIndex,
                             x: 0.1,
                             len: 0.85,
                             y: -0.35,
@@ -785,23 +809,26 @@
                 );
                 const metricTrace = {
                     x: S,
-                    y: metricFrames[0],
+                    y: metricFrames[frameIndex],
                     mode: "lines",
                     name: viewConfig.label,
                     line: { color: theme.value, width: 3 },
                     hovertemplate: `S = %{x:.2f}<br>${view} = %{y:.4f}<extra></extra>`,
                 };
 
-                let traces, frames;
+                let traces, frames, yRanges;
 
                 if (viewConfig.showPayoff) {
                     // Payoff never changes with time, so frames only update
                     // the metric trace (index 1, after payoff) as the
-                    // slider scrubs from today (t=0) to expiry (t=T).
+                    // slider scrubs from today (t=0) to expiry (t=T). Its
+                    // own range still feeds every frame's y-axis range,
+                    // though, so the payoff line is never clipped.
                     const payoffEnd = sliceAt(data.fine_grid_S);
+                    const payoffY = data.payoff_curve.slice(0, payoffEnd);
                     const payoffTrace = {
                         x: data.fine_grid_S.slice(0, payoffEnd),
-                        y: data.payoff_curve.slice(0, payoffEnd),
+                        y: payoffY,
                         mode: "lines",
                         name: "Payoff at expiry",
                         line: { color: theme.danger, width: 1.25, dash: "solid" },
@@ -809,19 +836,23 @@
                             "S = %{x:.2f}<br>payoff = %{y:.4f}<extra></extra>",
                     };
                     traces = [payoffTrace, metricTrace];
+                    yRanges = metricFrames.map((row) => computeYRange(row, payoffY));
                     frames = data.grid_t.map((t, k) => ({
                         name: `t${k}`,
                         data: [{ y: metricFrames[k] }],
                         traces: [1],
+                        layout: { "yaxis.range": yRanges[k] },
                     }));
                 } else {
                     // Single dynamic trace (index 0) -- no payoff-at-expiry
                     // analog to plot alongside a Greek.
                     traces = [metricTrace];
+                    yRanges = metricFrames.map((row) => computeYRange(row));
                     frames = data.grid_t.map((t, k) => ({
                         name: `t${k}`,
                         data: [{ y: metricFrames[k] }],
                         traces: [0],
+                        layout: { "yaxis.range": yRanges[k] },
                     }));
                 }
 
@@ -833,6 +864,7 @@
                     },
                     yaxis: {
                         title: viewConfig.yTitle,
+                        range: yRanges[frameIndex],
                         gridcolor: theme.grid,
                         color: theme.font,
                         zerolinecolor: theme.grid,
@@ -842,6 +874,10 @@
                 Plotly.newPlot("plot", traces, layout, { responsive: true }).then(
                     (gd) => {
                         Plotly.addFrames(gd, frames);
+                        gd.removeAllListeners("plotly_sliderchange");
+                        gd.on("plotly_sliderchange", (e) => {
+                            currentFrameIndex = e.slider.active;
+                        });
                     },
                 );
             }
