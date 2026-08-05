@@ -10,6 +10,7 @@ from fiqua.equities import (
     MarketData,
     Metric,
     PDEGrids,
+    PDESolverSettings,
     PricingRequest,
     Stock,
     StockQuote,
@@ -18,11 +19,14 @@ from fiqua.equities import (
 UNDERLYING_SYMBOL = "UNDERLYING"
 
 
-def price_portfolio(positions, spot, r, sigma, T):
+def price_portfolio(positions, spot, r, sigma, T, m=100, N=50, method="backward-difference", align_grid_to_strikes=True):
     try:
         stock = Stock(UNDERLYING_SYMBOL)
         market = MarketData(rate=r, quotes={UNDERLYING_SYMBOL: StockQuote(spot=spot, volatility=sigma)})
-        engine = BlackScholesPDEEngine(market=market)
+        settings = PDESolverSettings(
+            m=int(m), N=int(N), method=method, align_grid_to_strikes=bool(align_grid_to_strikes)
+        )
+        engine = BlackScholesPDEEngine(market=market, settings=settings)
         legs = [
             (
                 EuropeanOption(

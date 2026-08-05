@@ -447,6 +447,13 @@ section h2 {
 .data-table input[type="number"]:hover, .data-table input[type="text"]:hover, .data-table select:hover { border-bottom-color: var(--accent-3); }
 .data-table select { color-scheme: light dark; }
 
+/* data-table--params' value column sizes to its narrowest rows (plain
+   numbers, the On/Off toggle) under table auto-layout, which clips a
+   longer select option like "Backward difference" -- give selects in
+   this table a floor wide enough for the longest option text regardless
+   of what the rest of the column needs. */
+.data-table--params select { min-width: 12rem; }
+
 .row-action {
   display: inline-flex;
   align-items: center;

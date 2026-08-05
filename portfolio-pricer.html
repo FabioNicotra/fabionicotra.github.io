@@ -39,7 +39,7 @@
 
                 <div id="app" class="tool-grid pricer-grid reveal" style="display: none">
                     <div class="glass-card chart-card chart-card--tall">
-                        <div class="view-toggle" role="group" aria-label="Curve">
+                        <div class="view-toggle" id="curveToggle" role="group" aria-label="Curve">
                             <button type="button" class="view-toggle-btn is-active" data-view="value">Value</button>
                             <button type="button" class="view-toggle-btn" data-view="delta">Delta</button>
                             <button type="button" class="view-toggle-btn" data-view="gamma">Gamma</button>
@@ -71,8 +71,12 @@
                     </div>
 
                     <div class="glass-card">
-                        <h2>Common Parameters</h2>
-                        <table class="data-table data-table--params">
+                        <h2>Parameters</h2>
+                        <div class="view-toggle" id="paramsTabToggle" role="group" aria-label="Parameter group">
+                            <button type="button" class="view-toggle-btn is-active" data-tab="market">Market</button>
+                            <button type="button" class="view-toggle-btn" data-tab="grid">Grid</button>
+                        </div>
+                        <table class="data-table data-table--params" id="marketParamsTable">
                             <thead>
                                 <tr>
                                     <th>Parameter</th>
@@ -148,6 +152,71 @@
                                 </tr>
                             </tbody>
                         </table>
+                        <table class="data-table data-table--params" id="gridParamsTable" style="display: none">
+                            <thead>
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <label for="inp-m"
+                                            >Spatial steps (m)</label
+                                        >
+                                    </td>
+                                    <td>
+                                        <input
+                                            type="number"
+                                            id="inp-m"
+                                            value="100"
+                                            min="2"
+                                            step="10"
+                                        />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <label for="inp-N"
+                                            >Time steps (N)</label
+                                        >
+                                    </td>
+                                    <td>
+                                        <input
+                                            type="number"
+                                            id="inp-N"
+                                            value="50"
+                                            min="1"
+                                            step="5"
+                                        />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <label for="inp-method"
+                                            >Time-marching method</label
+                                        >
+                                    </td>
+                                    <td>
+                                        <select id="inp-method">
+                                            <option value="backward-difference" selected>Backward difference</option>
+                                            <option value="forward-difference">Forward difference</option>
+                                            <option value="crank-nicolson">Crank-Nicolson</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Snap grid to strikes</td>
+                                    <td>
+                                        <div class="view-toggle" id="alignToggle" role="group" aria-label="Snap grid to strikes">
+                                            <button type="button" class="view-toggle-btn is-active" data-align="true">On</button>
+                                            <button type="button" class="view-toggle-btn" data-align="false">Off</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
 
                     <div class="glass-card">
@@ -203,6 +272,7 @@
         <script>
             let pyodide;
             let currentView = "value";
+            let alignGridToStrikes = true;
             let lastCommon = null;
             let lastData = null;
 
@@ -276,9 +346,19 @@
 
                 initializeTable();
                 initializeViewToggle();
+                initializeParamsTabs();
+                initializeAlignToggle();
                 await updatePlot();
 
-                ["inp-S", "inp-r", "inp-sigma", "inp-T"].forEach((id) => {
+                [
+                    "inp-S",
+                    "inp-r",
+                    "inp-sigma",
+                    "inp-T",
+                    "inp-m",
+                    "inp-N",
+                    "inp-method",
+                ].forEach((id) => {
                     document
                         .getElementById(id)
                         .addEventListener("change", updatePlot);
@@ -291,15 +371,51 @@
                     });
             }
 
+            // Each pill-toggle group below is a distinct <button data-*>
+            // switcher (curve view, market/grid tab, snap-to-strikes) built
+            // on the same .view-toggle-btn visual component -- scoped to
+            // its own container so wiring one group doesn't also rebind
+            // buttons belonging to the others.
             function initializeViewToggle() {
-                document.querySelectorAll(".view-toggle-btn").forEach((btn) => {
+                document.querySelectorAll("#curveToggle .view-toggle-btn").forEach((btn) => {
                     btn.addEventListener("click", () => {
                         if (btn.classList.contains("is-active")) return;
                         document
-                            .querySelectorAll(".view-toggle-btn")
+                            .querySelectorAll("#curveToggle .view-toggle-btn")
                             .forEach((b) => b.classList.toggle("is-active", b === btn));
                         currentView = btn.dataset.view;
                         if (lastData) renderChart(lastCommon, lastData, currentView);
+                    });
+                });
+            }
+
+            function initializeParamsTabs() {
+                document.querySelectorAll("#paramsTabToggle .view-toggle-btn").forEach((btn) => {
+                    btn.addEventListener("click", () => {
+                        if (btn.classList.contains("is-active")) return;
+                        document
+                            .querySelectorAll("#paramsTabToggle .view-toggle-btn")
+                            .forEach((b) => b.classList.toggle("is-active", b === btn));
+                        const isGrid = btn.dataset.tab === "grid";
+                        document.getElementById("gridParamsTable").style.display = isGrid
+                            ? "table"
+                            : "none";
+                        document.getElementById("marketParamsTable").style.display = isGrid
+                            ? "none"
+                            : "table";
+                    });
+                });
+            }
+
+            function initializeAlignToggle() {
+                document.querySelectorAll("#alignToggle .view-toggle-btn").forEach((btn) => {
+                    btn.addEventListener("click", () => {
+                        if (btn.classList.contains("is-active")) return;
+                        document
+                            .querySelectorAll("#alignToggle .view-toggle-btn")
+                            .forEach((b) => b.classList.toggle("is-active", b === btn));
+                        alignGridToStrikes = btn.dataset.align === "true";
+                        updatePlot();
                     });
                 });
             }
@@ -406,6 +522,15 @@
                 };
             }
 
+            function readGridParams() {
+                return {
+                    m: parseInt(document.getElementById("inp-m").value, 10),
+                    N: parseInt(document.getElementById("inp-N").value, 10),
+                    method: document.getElementById("inp-method").value,
+                    alignGridToStrikes,
+                };
+            }
+
             function readPositions() {
                 const rows = document.querySelectorAll(
                     "#tableBody tr:not(.row-leave)",
@@ -429,7 +554,7 @@
                 return positions;
             }
 
-            function validateInputs(common, positions) {
+            function validateInputs(common, positions, grid) {
                 if (positions.length === 0) {
                     return {
                         valid: false,
@@ -458,6 +583,18 @@
                     return {
                         valid: false,
                         error: "Time to maturity must be a positive number.",
+                    };
+                }
+                if (Number.isNaN(grid.m) || grid.m < 2) {
+                    return {
+                        valid: false,
+                        error: "Spatial steps (m) must be an integer of at least 2.",
+                    };
+                }
+                if (Number.isNaN(grid.N) || grid.N < 1) {
+                    return {
+                        valid: false,
+                        error: "Time steps (N) must be an integer of at least 1.",
                     };
                 }
                 for (const p of positions) {
@@ -490,8 +627,9 @@
 
                 const statusEl = document.getElementById("status");
                 const common = readCommonParams();
+                const grid = readGridParams();
                 const positions = readPositions();
-                const check = validateInputs(common, positions);
+                const check = validateInputs(common, positions, grid);
 
                 if (!check.valid) {
                     statusEl.textContent = check.error;
@@ -509,7 +647,7 @@
 
                 const resultJson = await pyodide.runPythonAsync(`
             import json
-            json.dumps(price_portfolio(${JSON.stringify(positionsPayload)}, ${JSON.stringify(common.spot)}, ${JSON.stringify(common.r)}, ${JSON.stringify(common.sigma)}, ${JSON.stringify(common.T)}))
+            json.dumps(price_portfolio(${JSON.stringify(positionsPayload)}, ${JSON.stringify(common.spot)}, ${JSON.stringify(common.r)}, ${JSON.stringify(common.sigma)}, ${JSON.stringify(common.T)}, ${JSON.stringify(grid.m)}, ${JSON.stringify(grid.N)}, ${JSON.stringify(grid.method)}, ${grid.alignGridToStrikes ? "True" : "False"}))
         `);
 
                 const data = JSON.parse(resultJson);
