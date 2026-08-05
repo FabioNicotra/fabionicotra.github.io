@@ -39,30 +39,44 @@
 
                 <div id="app" class="tool-grid pricer-grid reveal" style="display: none">
                     <div class="glass-card chart-card chart-card--tall">
-                        <div class="view-toggle" role="group" aria-label="Curve">
+                        <div class="view-toggle" id="curveToggle" role="group" aria-label="Curve">
                             <button type="button" class="view-toggle-btn is-active" data-view="value">Value</button>
                             <button type="button" class="view-toggle-btn" data-view="delta">Delta</button>
+                            <button type="button" class="view-toggle-btn" data-view="gamma">Gamma</button>
+                            <button type="button" class="view-toggle-btn" data-view="theta">Theta</button>
                         </div>
                         <div id="plot"></div>
                     </div>
 
                     <div class="glass-card spot-metrics-card">
-                        <h2>At Spot</h2>
+                        <h2>Price &amp; Greeks</h2>
                         <div class="spot-metrics">
-                            <div class="metric-tile">
-                                <p class="metric-label">Price</p>
-                                <p class="metric-value" id="metric-price">—</p>
+                            <div class="metric-row metric-row--primary">
+                                <span class="metric-label">Price</span>
+                                <span class="metric-value" id="metric-price">—</span>
                             </div>
-                            <div class="metric-tile">
-                                <p class="metric-label">Delta</p>
-                                <p class="metric-value" id="metric-delta">—</p>
+                            <div class="metric-row">
+                                <span class="metric-label">Delta</span>
+                                <span class="metric-value" id="metric-delta">—</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">Gamma</span>
+                                <span class="metric-value" id="metric-gamma">—</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">Theta</span>
+                                <span class="metric-value" id="metric-theta">—</span>
                             </div>
                         </div>
                     </div>
 
                     <div class="glass-card">
-                        <h2>Common Parameters</h2>
-                        <table class="data-table data-table--params">
+                        <h2>Parameters</h2>
+                        <div class="view-toggle" id="paramsTabToggle" role="group" aria-label="Parameter group">
+                            <button type="button" class="view-toggle-btn is-active" data-tab="market">Market</button>
+                            <button type="button" class="view-toggle-btn" data-tab="grid">Grid</button>
+                        </div>
+                        <table class="data-table data-table--params" id="marketParamsTable">
                             <thead>
                                 <tr>
                                     <th>Parameter</th>
@@ -138,6 +152,71 @@
                                 </tr>
                             </tbody>
                         </table>
+                        <table class="data-table data-table--params" id="gridParamsTable" style="display: none">
+                            <thead>
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <label for="inp-m"
+                                            >Spatial steps (m)</label
+                                        >
+                                    </td>
+                                    <td>
+                                        <input
+                                            type="number"
+                                            id="inp-m"
+                                            value="100"
+                                            min="2"
+                                            step="10"
+                                        />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <label for="inp-N"
+                                            >Time steps (N)</label
+                                        >
+                                    </td>
+                                    <td>
+                                        <input
+                                            type="number"
+                                            id="inp-N"
+                                            value="50"
+                                            min="1"
+                                            step="5"
+                                        />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <label for="inp-method"
+                                            >Time-marching method</label
+                                        >
+                                    </td>
+                                    <td>
+                                        <select id="inp-method">
+                                            <option value="backward-difference" selected>Backward difference</option>
+                                            <option value="forward-difference">Forward difference</option>
+                                            <option value="crank-nicolson">Crank-Nicolson</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Snap grid to strikes</td>
+                                    <td>
+                                        <div class="view-toggle" id="alignToggle" role="group" aria-label="Snap grid to strikes">
+                                            <button type="button" class="view-toggle-btn is-active" data-align="true">On</button>
+                                            <button type="button" class="view-toggle-btn" data-align="false">Off</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
 
                     <div class="glass-card">
@@ -193,8 +272,46 @@
         <script>
             let pyodide;
             let currentView = "value";
+            let alignGridToStrikes = true;
+            let currentFrameIndex = 0;
             let lastCommon = null;
             let lastData = null;
+
+            const SPOT_METRICS = [
+                { id: "metric-price", key: "spot_value" },
+                { id: "metric-delta", key: "spot_delta" },
+                { id: "metric-gamma", key: "spot_gamma" },
+                { id: "metric-theta", key: "spot_theta" },
+            ];
+
+            const CURVE_VIEWS = {
+                value: {
+                    dataKey: "value_grid",
+                    label: "Portfolio value",
+                    yTitle: "Value / payoff",
+                    title: "Portfolio Value & Payoff vs. Spot Price",
+                    showPayoff: true,
+                },
+                delta: {
+                    dataKey: "delta_grid",
+                    label: "Portfolio delta",
+                    yTitle: "Delta",
+                    title: "Portfolio Delta vs. Spot Price",
+                },
+                gamma: {
+                    dataKey: "gamma_grid",
+                    label: "Portfolio gamma",
+                    yTitle: "Gamma",
+                    title: "Portfolio Gamma vs. Spot Price",
+                },
+                theta: {
+                    dataKey: "theta_grid",
+                    label: "Portfolio theta",
+                    yTitle: "Theta",
+                    title: "Portfolio Theta vs. Spot Price",
+                },
+            };
+
             const defaultPositions = [
                 { quantity: 1, type: "call", strike: 100, direction: "long" },
                 { quantity: 1, type: "call", strike: 110, direction: "short" },
@@ -230,9 +347,19 @@
 
                 initializeTable();
                 initializeViewToggle();
+                initializeParamsTabs();
+                initializeAlignToggle();
                 await updatePlot();
 
-                ["inp-S", "inp-r", "inp-sigma", "inp-T"].forEach((id) => {
+                [
+                    "inp-S",
+                    "inp-r",
+                    "inp-sigma",
+                    "inp-T",
+                    "inp-m",
+                    "inp-N",
+                    "inp-method",
+                ].forEach((id) => {
                     document
                         .getElementById(id)
                         .addEventListener("change", updatePlot);
@@ -245,15 +372,51 @@
                     });
             }
 
+            // Each pill-toggle group below is a distinct <button data-*>
+            // switcher (curve view, market/grid tab, snap-to-strikes) built
+            // on the same .view-toggle-btn visual component -- scoped to
+            // its own container so wiring one group doesn't also rebind
+            // buttons belonging to the others.
             function initializeViewToggle() {
-                document.querySelectorAll(".view-toggle-btn").forEach((btn) => {
+                document.querySelectorAll("#curveToggle .view-toggle-btn").forEach((btn) => {
                     btn.addEventListener("click", () => {
                         if (btn.classList.contains("is-active")) return;
                         document
-                            .querySelectorAll(".view-toggle-btn")
+                            .querySelectorAll("#curveToggle .view-toggle-btn")
                             .forEach((b) => b.classList.toggle("is-active", b === btn));
                         currentView = btn.dataset.view;
                         if (lastData) renderChart(lastCommon, lastData, currentView);
+                    });
+                });
+            }
+
+            function initializeParamsTabs() {
+                document.querySelectorAll("#paramsTabToggle .view-toggle-btn").forEach((btn) => {
+                    btn.addEventListener("click", () => {
+                        if (btn.classList.contains("is-active")) return;
+                        document
+                            .querySelectorAll("#paramsTabToggle .view-toggle-btn")
+                            .forEach((b) => b.classList.toggle("is-active", b === btn));
+                        const isGrid = btn.dataset.tab === "grid";
+                        document.getElementById("gridParamsTable").style.display = isGrid
+                            ? "table"
+                            : "none";
+                        document.getElementById("marketParamsTable").style.display = isGrid
+                            ? "none"
+                            : "table";
+                    });
+                });
+            }
+
+            function initializeAlignToggle() {
+                document.querySelectorAll("#alignToggle .view-toggle-btn").forEach((btn) => {
+                    btn.addEventListener("click", () => {
+                        if (btn.classList.contains("is-active")) return;
+                        document
+                            .querySelectorAll("#alignToggle .view-toggle-btn")
+                            .forEach((b) => b.classList.toggle("is-active", b === btn));
+                        alignGridToStrikes = btn.dataset.align === "true";
+                        updatePlot();
                     });
                 });
             }
@@ -360,6 +523,15 @@
                 };
             }
 
+            function readGridParams() {
+                return {
+                    m: parseInt(document.getElementById("inp-m").value, 10),
+                    N: parseInt(document.getElementById("inp-N").value, 10),
+                    method: document.getElementById("inp-method").value,
+                    alignGridToStrikes,
+                };
+            }
+
             function readPositions() {
                 const rows = document.querySelectorAll(
                     "#tableBody tr:not(.row-leave)",
@@ -383,7 +555,7 @@
                 return positions;
             }
 
-            function validateInputs(common, positions) {
+            function validateInputs(common, positions, grid) {
                 if (positions.length === 0) {
                     return {
                         valid: false,
@@ -414,6 +586,18 @@
                         error: "Time to maturity must be a positive number.",
                     };
                 }
+                if (Number.isNaN(grid.m) || grid.m < 2) {
+                    return {
+                        valid: false,
+                        error: "Spatial steps (m) must be an integer of at least 2.",
+                    };
+                }
+                if (Number.isNaN(grid.N) || grid.N < 1) {
+                    return {
+                        valid: false,
+                        error: "Time steps (N) must be an integer of at least 1.",
+                    };
+                }
                 for (const p of positions) {
                     if (Number.isNaN(p.quantity) || Math.abs(p.quantity) <= 0) {
                         return {
@@ -432,11 +616,24 @@
             }
 
             function setMetricsUnavailable() {
-                ["metric-price", "metric-delta"].forEach((id) => {
+                SPOT_METRICS.forEach(({ id }) => {
                     const el = document.getElementById(id);
                     el.textContent = "—";
                     el.classList.add("is-unavailable");
                 });
+            }
+
+            // A failed price (bad input, or a grid fiqua can't trust) has
+            // nothing valid to plot -- showing the previous run's chart and
+            // numbers next to a "here's what's wrong" banner reads as if
+            // they still applied. Hide both result cards until the next
+            // successful price, instead of leaving stale output on screen.
+            function setResultsVisible(visible) {
+                document.querySelector(".chart-card").style.display = visible
+                    ? ""
+                    : "none";
+                document.querySelector(".spot-metrics-card").style.display =
+                    visible ? "" : "none";
             }
 
             async function updatePlot() {
@@ -444,14 +641,16 @@
 
                 const statusEl = document.getElementById("status");
                 const common = readCommonParams();
+                const grid = readGridParams();
                 const positions = readPositions();
-                const check = validateInputs(common, positions);
+                const check = validateInputs(common, positions, grid);
 
                 if (!check.valid) {
                     statusEl.textContent = check.error;
                     statusEl.classList.add("error");
                     statusEl.style.display = "block";
                     setMetricsUnavailable();
+                    setResultsVisible(false);
                     return;
                 }
 
@@ -463,7 +662,7 @@
 
                 const resultJson = await pyodide.runPythonAsync(`
             import json
-            json.dumps(price_portfolio(${JSON.stringify(positionsPayload)}, ${JSON.stringify(common.spot)}, ${JSON.stringify(common.r)}, ${JSON.stringify(common.sigma)}, ${JSON.stringify(common.T)}))
+            json.dumps(price_portfolio(${JSON.stringify(positionsPayload)}, ${JSON.stringify(common.spot)}, ${JSON.stringify(common.r)}, ${JSON.stringify(common.sigma)}, ${JSON.stringify(common.T)}, ${JSON.stringify(grid.m)}, ${JSON.stringify(grid.N)}, ${JSON.stringify(grid.method)}, ${grid.alignGridToStrikes ? "True" : "False"}))
         `);
 
                 const data = JSON.parse(resultJson);
@@ -473,22 +672,39 @@
                     statusEl.classList.add("error");
                     statusEl.style.display = "block";
                     setMetricsUnavailable();
+                    setResultsVisible(false);
                     return;
                 }
 
                 statusEl.style.display = "none";
                 statusEl.classList.remove("error");
+                setResultsVisible(true);
 
-                const priceEl = document.getElementById("metric-price");
-                const deltaEl = document.getElementById("metric-delta");
-                priceEl.textContent = data.spot_value.toFixed(4);
-                deltaEl.textContent = data.spot_delta.toFixed(4);
-                priceEl.classList.remove("is-unavailable");
-                deltaEl.classList.remove("is-unavailable");
+                SPOT_METRICS.forEach(({ id, key }) => {
+                    const el = document.getElementById(id);
+                    el.textContent = data[key].toFixed(4);
+                    el.classList.remove("is-unavailable");
+                });
 
                 lastCommon = common;
                 lastData = data;
                 renderChart(common, data, currentView);
+            }
+
+            // Padded [min, max] over one or more value arrays -- shared by
+            // every frame's y-axis range below, so the axis fits whatever
+            // is on screen at that time step instead of a single fixed
+            // range sized for frame 0.
+            function computeYRange(...valueArrays) {
+                const values = [].concat(...valueArrays);
+                const min = Math.min(...values);
+                const max = Math.max(...values);
+                if (min === max) {
+                    const pad = Math.abs(min) * 0.1 || 1;
+                    return [min - pad, max + pad];
+                }
+                const pad = (max - min) * 0.08;
+                return [min - pad, max + pad];
             }
 
             function renderChart(common, data, view) {
@@ -513,6 +729,12 @@
                 const valueEnd = sliceAt(data.grid_S);
                 const S = data.grid_S.slice(0, valueEnd);
 
+                // Same time index the slider was left at, whichever view or
+                // dataset produced it -- clamped in case a grid-settings
+                // change resolved to fewer time steps than before.
+                const frameIndex = Math.min(currentFrameIndex, data.grid_t.length - 1);
+                currentFrameIndex = frameIndex;
+
                 const shapes = [
                     {
                         type: "line",
@@ -526,17 +748,18 @@
                     },
                 ];
 
+                // Smooth, non-zero durations so both the curve and the
+                // y-axis range animate into place as the slider moves,
+                // instead of snapping.
+                const animationOpts = {
+                    mode: "immediate",
+                    transition: { duration: 250, easing: "cubic-in-out" },
+                    frame: { duration: 250, redraw: true },
+                };
                 const steps = data.grid_t.map((t, k) => ({
                     label: t.toFixed(2),
                     method: "animate",
-                    args: [
-                        [`t${k}`],
-                        {
-                            mode: "immediate",
-                            transition: { duration: 0 },
-                            frame: { duration: 0, redraw: true },
-                        },
-                    ],
+                    args: [[`t${k}`], animationOpts],
                 }));
 
                 const baseLayout = {
@@ -560,7 +783,7 @@
                     },
                     sliders: [
                         {
-                            active: 0,
+                            active: frameIndex,
                             x: 0.1,
                             len: 0.85,
                             y: -0.35,
@@ -580,96 +803,81 @@
                     margin: { l: 60, r: 30, t: 50, b: 150 },
                 };
 
-                let traces, frames, layout;
+                const viewConfig = CURVE_VIEWS[view];
+                const metricFrames = data[viewConfig.dataKey].map((row) =>
+                    row.slice(0, valueEnd),
+                );
+                const metricTrace = {
+                    x: S,
+                    y: metricFrames[frameIndex],
+                    mode: "lines",
+                    name: viewConfig.label,
+                    line: { color: theme.value, width: 3 },
+                    hovertemplate: `S = %{x:.2f}<br>${view} = %{y:.4f}<extra></extra>`,
+                };
 
-                if (view === "delta") {
-                    // Single dynamic trace (index 0) this time -- no
-                    // payoff-at-expiry analog to plot alongside it.
-                    const deltaFrames = data.delta_grid.map((row) =>
-                        row.slice(0, valueEnd),
-                    );
-                    const deltaTrace = {
-                        x: S,
-                        y: deltaFrames[0],
-                        mode: "lines",
-                        name: "Portfolio delta",
-                        line: { color: theme.value, width: 3 },
-                        hovertemplate:
-                            "S = %{x:.2f}<br>delta = %{y:.4f}<extra></extra>",
-                    };
-                    traces = [deltaTrace];
-                    frames = data.grid_t.map((t, k) => ({
-                        name: `t${k}`,
-                        data: [{ y: deltaFrames[k] }],
-                        traces: [0],
-                    }));
-                    layout = {
-                        ...baseLayout,
-                        title: {
-                            text: "Portfolio Delta vs. Spot Price",
-                            font: { color: theme.font },
-                        },
-                        yaxis: {
-                            title: "Delta",
-                            gridcolor: theme.grid,
-                            color: theme.font,
-                            zerolinecolor: theme.grid,
-                        },
-                    };
-                } else {
+                let traces, frames, yRanges;
+
+                if (viewConfig.showPayoff) {
+                    // Payoff never changes with time, so frames only update
+                    // the metric trace (index 1, after payoff) as the
+                    // slider scrubs from today (t=0) to expiry (t=T). Its
+                    // own range still feeds every frame's y-axis range,
+                    // though, so the payoff line is never clipped.
                     const payoffEnd = sliceAt(data.fine_grid_S);
-                    const fineS = data.fine_grid_S.slice(0, payoffEnd);
-                    const payoffCurve = data.payoff_curve.slice(0, payoffEnd);
-                    const valueFrames = data.value_grid.map((row) =>
-                        row.slice(0, valueEnd),
-                    );
-
+                    const payoffY = data.payoff_curve.slice(0, payoffEnd);
                     const payoffTrace = {
-                        x: fineS,
-                        y: payoffCurve,
+                        x: data.fine_grid_S.slice(0, payoffEnd),
+                        y: payoffY,
                         mode: "lines",
                         name: "Payoff at expiry",
                         line: { color: theme.danger, width: 1.25, dash: "solid" },
                         hovertemplate:
                             "S = %{x:.2f}<br>payoff = %{y:.4f}<extra></extra>",
                     };
-                    const valueTrace = {
-                        x: S,
-                        y: valueFrames[0],
-                        mode: "lines",
-                        name: "Portfolio value",
-                        line: { color: theme.value, width: 3 },
-                        hovertemplate:
-                            "S = %{x:.2f}<br>value = %{y:.4f}<extra></extra>",
-                    };
-
-                    // Payoff (trace 0) never changes with time, so frames
-                    // only update the portfolio-value trace (1) as the
-                    // slider scrubs from today (t=0) to expiry (t=T).
-                    traces = [payoffTrace, valueTrace];
+                    traces = [payoffTrace, metricTrace];
+                    yRanges = metricFrames.map((row) => computeYRange(row, payoffY));
                     frames = data.grid_t.map((t, k) => ({
                         name: `t${k}`,
-                        data: [{ y: valueFrames[k] }],
+                        data: [{ y: metricFrames[k] }],
                         traces: [1],
+                        layout: { "yaxis.range": yRanges[k] },
                     }));
-                    layout = {
-                        ...baseLayout,
-                        title: {
-                            text: "Portfolio Value & Payoff vs. Spot Price",
-                            font: { color: theme.font },
-                        },
-                        yaxis: {
-                            title: "Value / payoff",
-                            gridcolor: theme.grid,
-                            color: theme.font,
-                            zerolinecolor: theme.grid,
-                        },
-                    };
+                } else {
+                    // Single dynamic trace (index 0) -- no payoff-at-expiry
+                    // analog to plot alongside a Greek.
+                    traces = [metricTrace];
+                    yRanges = metricFrames.map((row) => computeYRange(row));
+                    frames = data.grid_t.map((t, k) => ({
+                        name: `t${k}`,
+                        data: [{ y: metricFrames[k] }],
+                        traces: [0],
+                        layout: { "yaxis.range": yRanges[k] },
+                    }));
                 }
+
+                const layout = {
+                    ...baseLayout,
+                    title: {
+                        text: viewConfig.title,
+                        font: { color: theme.font },
+                    },
+                    yaxis: {
+                        title: viewConfig.yTitle,
+                        range: yRanges[frameIndex],
+                        gridcolor: theme.grid,
+                        color: theme.font,
+                        zerolinecolor: theme.grid,
+                    },
+                };
 
                 Plotly.newPlot("plot", traces, layout, { responsive: true }).then(
                     (gd) => {
                         Plotly.addFrames(gd, frames);
+                        gd.removeAllListeners("plotly_sliderchange");
+                        gd.on("plotly_sliderchange", (e) => {
+                            currentFrameIndex = e.slider.active;
+                        });
                     },
                 );
             }
