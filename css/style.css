@@ -414,17 +414,28 @@ section h2 {
 .data-table td:last-child { text-align: center; width: 2.5rem; }
 .data-table--params td:last-child { text-align: left; width: auto; }
 
+/* Market and Grid tabs are two separate <table>s (see initializeParamsTabs)
+   that swap via display:none. Under auto-layout, a %/fixed width on the
+   label column is still just a hint: the browser also weighs each table's
+   own min-content (e.g. the Grid tab's select, which has a 12rem floor
+   below), so the two tables settle on different label widths and the
+   column visibly shifts when switching tabs. table-layout:fixed makes the
+   column widths purely a function of the specified percentages, the same
+   in both tables regardless of what their own content wants. */
+.data-table--params { table-layout: fixed; }
+.data-table--params th:first-child, .data-table--params td:first-child { width: 58%; }
+
 /* Positions: table-layout:fixed with every column given a share means
    the extra width from the wider grid track is distributed across all
    of them proportionally, instead of auto-layout dumping 100% of the
    slack into whichever column has no explicit width (Direction, before
    this) and leaving a large blank gap next to it. */
-.data-table--positions { table-layout: fixed; min-width: 480px; }
-.data-table--positions th:nth-child(1), .data-table--positions td:nth-child(1) { width: 32%; }
+.data-table--positions { table-layout: fixed; min-width: 385px; }
+.data-table--positions th:nth-child(1), .data-table--positions td:nth-child(1) { width: 33%; }
 .data-table--positions th:nth-child(2), .data-table--positions td:nth-child(2) { width: 14%; }
 .data-table--positions th:nth-child(3), .data-table--positions td:nth-child(3) { width: 22%; }
-.data-table--positions th:nth-child(4), .data-table--positions td:nth-child(4) { width: 20%; }
-.data-table--positions th:last-child, .data-table--positions td:last-child { width: 12%; }
+.data-table--positions th:nth-child(4), .data-table--positions td:nth-child(4) { width: 17%; }
+.data-table--positions th:last-child, .data-table--positions td:last-child { width: 14%; }
 
 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
