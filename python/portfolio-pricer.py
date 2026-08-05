@@ -1,5 +1,5 @@
 import micropip
-await micropip.install("fiqua==0.2.3")
+await micropip.install("fiqua==0.2.4")
 
 import json
 import numpy as np
@@ -19,7 +19,7 @@ from fiqua.equities import (
 UNDERLYING_SYMBOL = "UNDERLYING"
 
 
-def price_portfolio(positions, spot, r, sigma, T, m=100, N=50, method="backward-difference", align_grid_to_strikes=True):
+def price_portfolio(positions, spot, r, sigma, T, m=200, N=100, method="backward-difference", align_grid_to_strikes=True):
     try:
         stock = Stock(UNDERLYING_SYMBOL)
         market = MarketData(rate=r, quotes={UNDERLYING_SYMBOL: StockQuote(spot=spot, volatility=sigma)})
@@ -59,7 +59,7 @@ def price_portfolio(positions, spot, r, sigma, T, m=100, N=50, method="backward-
     S_max = float(grid_S[-1])
 
     # Payoff is pure arithmetic (no PDE involved), so evaluate it on a much
-    # finer grid than the PDE's -- the PDE grid (m=100 by default) is coarse
+    # finer grid than the PDE's -- the PDE grid (m=200 by default) is coarse
     # enough that payoff's kinks look jagged, unlike the value curve, which
     # is smooth by construction and doesn't need this. Strikes are folded
     # into the grid explicitly (union1d sorts + dedupes) so each kink lands
