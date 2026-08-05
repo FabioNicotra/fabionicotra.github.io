@@ -15,6 +15,7 @@ from fiqua.equities import (
     Stock,
     StockQuote,
 )
+from numanlib.interpolation import CubicSpline
 
 UNDERLYING_SYMBOL = "UNDERLYING"
 
@@ -85,31 +86,36 @@ def price_portfolio(positions, spot, r, sigma, T, m=200, N=100, method="backward
 
     grid_t = [float(grid_t_full[j]) for j in idx]
 
-    # fiqua's PDEGrids (0.2.3+) hands back the already-solved value surface
-    # as a smooth cubic spline per time slice, with exact derivatives (no
-    # bump-and-reprice, no np.gradient approximation) -- value/delta/gamma
-    # curves all come from the same pv_curve. Theta has no curve builder of
-    # its own on PDEGrids, so it's a forward difference between adjacent
-    # *full-resolution* solved time columns (fiqua's own _build_theta_curve
-    # does the same thing, just for t=0 only) -- backward difference on the
-    # last time step, since there's no t+1 to diff against there.
+    # fiqua's PDEGrids hands back the already-solved value surface as a
+    # smooth cubic spline per time slice, with exact derivatives (no bump-
+    # and-reprice, no finite-difference approximation) -- value/delta/gamma
+    # curves all come from the same pv_curve.
     grids = PDEGrids(priced)
-    value_grid, delta_grid, gamma_grid, theta_grid = [], [], [], []
+    value_grid, delta_grid, gamma_grid = [], [], []
     for k in idx:
         pv_curve = grids.pv(float(grid_t_full[k]))
         value_grid.append(pv_curve(grid_S).tolist())
         delta_grid.append(pv_curve.derivative(grid_S, order=1).tolist())
         gamma_grid.append(pv_curve.derivative(grid_S, order=2).tolist())
 
-        if k + 1 < n_t:
-            pv_other = grids.pv(float(grid_t_full[k + 1]))
-            dt = float(grid_t_full[k + 1] - grid_t_full[k])
-            theta_row = (pv_other(grid_S) - pv_curve(grid_S)) / dt
-        else:
-            pv_other = grids.pv(float(grid_t_full[k - 1]))
-            dt = float(grid_t_full[k] - grid_t_full[k - 1])
-            theta_row = (pv_curve(grid_S) - pv_other(grid_S)) / dt
-        theta_grid.append(theta_row.tolist())
+    # Theta has no curve builder on PDEGrids, but fiqua's own Metric.THETA
+    # (spot_theta below) doesn't use a finite difference either as of
+    # 0.2.4 -- it fits a cubic spline through the *full* solved time
+    # history at a spot and differentiates that exactly. Same idea here,
+    # generalized across every displayed spot instead of just the market's
+    # one: one time-axis spline per spatial grid point (fit once from the
+    # full-resolution surface, reused for every displayed time step), each
+    # differentiated exactly at that step -- no more 2-point secant, and no
+    # more special-casing the last time step (the spline's own boundary
+    # handles that the same way fiqua's does).
+    time_splines = [
+        CubicSpline(grid_t_full, result.solution[i, :]).interpolate()
+        for i in range(len(grid_S))
+    ]
+    theta_grid = [
+        [spline.derivative(float(grid_t_full[k])) for spline in time_splines]
+        for k in idx
+    ]
 
     # Spot Greeks come straight from fiqua's own metrics rather than this
     # file re-deriving them from the grid -- more accurate (fiqua spline-
