@@ -225,7 +225,7 @@
                             <table class="data-table data-table--positions" id="positionsTable">
                                 <thead>
                                     <tr>
-                                        <th>Direction</th>
+                                        <th aria-label="Direction"><span class="th-full">Direction</span><span class="th-short" aria-hidden="true">Dir</span></th>
                                         <th>Qty</th>
                                         <th>Type</th>
                                         <th>Strike</th>
@@ -445,8 +445,8 @@
                 row.innerHTML = `
             <td>
                 <div class="direction-toggle" role="group" aria-label="Position direction">
-                    <button type="button" class="direction-btn" data-direction="long">Long</button>
-                    <button type="button" class="direction-btn" data-direction="short">Short</button>
+                    <button type="button" class="direction-btn" data-direction="long" aria-label="Long"><span class="direction-btn-full">Long</span><span class="direction-btn-short" aria-hidden="true">L</span></button>
+                    <button type="button" class="direction-btn" data-direction="short" aria-label="Short"><span class="direction-btn-full">Short</span><span class="direction-btn-short" aria-hidden="true">S</span></button>
                 </div>
             </td>
             <td><input type="number" class="quantity-input" value="${Math.abs(quantity)}" min="0" step="1" inputmode="numeric"></td>

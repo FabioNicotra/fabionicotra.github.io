@@ -511,6 +511,28 @@ section h2 {
 .direction-btn:hover { color: var(--fg); }
 .direction-btn.is-active[data-direction="long"] { background: var(--success); color: #fff; }
 .direction-btn.is-active[data-direction="short"] { background: var(--danger); color: #fff; }
+.direction-btn-short { display: none; }
+.th-short { display: none; }
+
+/* Mobile: the Direction column only needs to fit two letter-pills once
+   labels are abbreviated, so it can give most of its share back to the
+   other columns and let the min-width shrink close to phone widths. The
+   "Direction" header is abbreviated to "Dir" for the same reason. */
+@media (max-width: 600px) {
+  .direction-btn-full { display: none; }
+  .direction-btn-short { display: inline; }
+  .direction-btn { padding: 0.35rem 0.55rem; }
+  .th-full { display: none; }
+  .th-short { display: inline; }
+
+  .data-table--positions { min-width: 300px; }
+  .data-table--positions th:nth-child(1), .data-table--positions td:nth-child(1) { width: 19%; }
+  .data-table--positions th:nth-child(2), .data-table--positions td:nth-child(2) { width: 18%; }
+  .data-table--positions th:nth-child(3), .data-table--positions td:nth-child(3) { width: 25%; }
+  .data-table--positions th:nth-child(4), .data-table--positions td:nth-child(4) { width: 24%; }
+  .data-table--positions th:last-child, .data-table--positions td:last-child { width: 14%; }
+  .data-table--positions th, .data-table--positions td { padding: 0.35rem 0.25rem; }
+}
 
 /* Chart curve toggle: same pill-group pattern as direction-toggle above,
    but neutral (accent-2) since Value/Delta aren't a long/short pair. */
