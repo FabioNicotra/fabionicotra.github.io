@@ -622,6 +622,19 @@
                 });
             }
 
+            // A failed price (bad input, or a grid fiqua can't trust) has
+            // nothing valid to plot -- showing the previous run's chart and
+            // numbers next to a "here's what's wrong" banner reads as if
+            // they still applied. Hide both result cards until the next
+            // successful price, instead of leaving stale output on screen.
+            function setResultsVisible(visible) {
+                document.querySelector(".chart-card").style.display = visible
+                    ? ""
+                    : "none";
+                document.querySelector(".spot-metrics-card").style.display =
+                    visible ? "" : "none";
+            }
+
             async function updatePlot() {
                 if (!pyodide) return;
 
@@ -636,6 +649,7 @@
                     statusEl.classList.add("error");
                     statusEl.style.display = "block";
                     setMetricsUnavailable();
+                    setResultsVisible(false);
                     return;
                 }
 
@@ -657,11 +671,13 @@
                     statusEl.classList.add("error");
                     statusEl.style.display = "block";
                     setMetricsUnavailable();
+                    setResultsVisible(false);
                     return;
                 }
 
                 statusEl.style.display = "none";
                 statusEl.classList.remove("error");
+                setResultsVisible(true);
 
                 SPOT_METRICS.forEach(({ id, key }) => {
                     const el = document.getElementById(id);
