@@ -532,17 +532,38 @@ section h2 {
 @media (max-width: 600px) {
   .direction-btn-full { display: none; }
   .direction-btn-short { display: inline; }
-  .direction-btn { padding: 0.35rem 0.55rem; }
+  .direction-btn { padding: 0.3rem 0.35rem; }
   .th-full { display: none; }
   .th-short { display: inline; }
 
-  .data-table--positions { min-width: 300px; }
+  /* main/.glass-card padding isn't reduced on mobile, so a phone-width card
+     only has ~245-300px of inner content to work with -- not enough for a
+     table sized off the ≥600px column shares (they assume hundreds of px of
+     slack for select min-widths etc). Recompute the columns from what each
+     one's content actually needs at this width instead of reusing those
+     shares, and give the delete button's column enough room even though
+     it's the narrowest -- .row-action is a fixed 1.9rem and can't shrink. */
+  .data-table--positions { min-width: 245px; }
+  .data-table--positions th, .data-table--positions td { padding: 0.35rem 0.15rem; }
   .data-table--positions th:nth-child(1), .data-table--positions td:nth-child(1) { width: 19%; }
-  .data-table--positions th:nth-child(2), .data-table--positions td:nth-child(2) { width: 18%; }
+  .data-table--positions th:nth-child(2), .data-table--positions td:nth-child(2) { width: 21%; }
   .data-table--positions th:nth-child(3), .data-table--positions td:nth-child(3) { width: 25%; }
-  .data-table--positions th:nth-child(4), .data-table--positions td:nth-child(4) { width: 24%; }
-  .data-table--positions th:last-child, .data-table--positions td:last-child { width: 14%; }
-  .data-table--positions th, .data-table--positions td { padding: 0.35rem 0.25rem; }
+  .data-table--positions th:nth-child(4), .data-table--positions td:nth-child(4) { width: 22%; }
+  .data-table--positions th:last-child, .data-table--positions td:last-child { width: 13%; }
+
+  /* Params: keep the same side-by-side label|value row used at >=600px
+     (table-layout:fixed, label column pinned to 58%, css/style.css:425-426)
+     -- only the label TEXT should wrap onto more lines on a narrow phone,
+     not the whole input dropping to a line of its own. The thing that
+     actually broke mobile wasn't the two-column row, it was
+     `.data-table--params select { min-width: 12rem }` (below) forcing the
+     Grid tab's <select> wider than its ~42% share of a phone-width card
+     (~245-300px total), which overflowed the page and made switching tabs
+     look like an unwanted zoom. Drop that floor on narrow screens instead
+     of restructuring the row: the select just shrinks to its column and
+     the browser truncates "Backward difference" on its own, the same way
+     any narrow <select> does. */
+  .data-table--params select { min-width: 0; }
 }
 
 /* Chart curve toggle: same pill-group pattern as direction-toggle above,
