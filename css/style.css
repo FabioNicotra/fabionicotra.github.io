@@ -532,17 +532,56 @@ section h2 {
 @media (max-width: 600px) {
   .direction-btn-full { display: none; }
   .direction-btn-short { display: inline; }
-  .direction-btn { padding: 0.35rem 0.55rem; }
+  .direction-btn { padding: 0.3rem 0.35rem; }
   .th-full { display: none; }
   .th-short { display: inline; }
 
-  .data-table--positions { min-width: 300px; }
+  /* main/.glass-card padding isn't reduced on mobile, so a phone-width card
+     only has ~245-300px of inner content to work with -- not enough for a
+     table sized off the ≥600px column shares (they assume hundreds of px of
+     slack for select min-widths etc). Recompute the columns from what each
+     one's content actually needs at this width instead of reusing those
+     shares, and give the delete button's column enough room even though
+     it's the narrowest -- .row-action is a fixed 1.9rem and can't shrink. */
+  .data-table--positions { min-width: 245px; }
+  .data-table--positions th, .data-table--positions td { padding: 0.35rem 0.15rem; }
   .data-table--positions th:nth-child(1), .data-table--positions td:nth-child(1) { width: 19%; }
-  .data-table--positions th:nth-child(2), .data-table--positions td:nth-child(2) { width: 18%; }
+  .data-table--positions th:nth-child(2), .data-table--positions td:nth-child(2) { width: 21%; }
   .data-table--positions th:nth-child(3), .data-table--positions td:nth-child(3) { width: 25%; }
-  .data-table--positions th:nth-child(4), .data-table--positions td:nth-child(4) { width: 24%; }
-  .data-table--positions th:last-child, .data-table--positions td:last-child { width: 14%; }
-  .data-table--positions th, .data-table--positions td { padding: 0.35rem 0.25rem; }
+  .data-table--positions th:nth-child(4), .data-table--positions td:nth-child(4) { width: 22%; }
+  .data-table--positions th:last-child, .data-table--positions td:last-child { width: 13%; }
+
+  /* Params: the ≥600px fix (table-layout:fixed, label column pinned to 58%)
+     forces the Grid tab's <select> (12rem floor, for "Backward difference")
+     into a ~42% value column that doesn't fit a phone card's ~245-300px
+     budget -- that overflow is what widens the whole page and makes
+     switching tabs look like a zoom. Stack label above value instead of
+     splitting the row into two columns, so each gets the full card width
+     and the 12rem floor only has to fit alone.
+     initializeParamsTabs() toggles the *table* element's own visibility via
+     element.style.display ("table"/"none"), an inline style that outranks
+     a plain stylesheet rule -- and just blockifying the table's
+     descendants without also blockifying the table itself leaves it
+     inside a display:table box, which anonymous-box-wraps those
+     descendants back into a table structure and defeats the stacking
+     (labels/inputs shrink to fit instead of spanning full width). Forcing
+     `display:block` on the table needs !important to win over the inline
+     style, but doing that unconditionally also defeats `display:none` on
+     the *inactive* tab's table, showing both tabs' rows at once --
+     :not([style*="display: none"]) excludes that one from the override so
+     it stays hidden via its own inline style, untouched. */
+  .data-table--params:not([style*="display: none"]) { display: block !important; }
+  .data-table--params, .data-table--params thead, .data-table--params tbody,
+  .data-table--params tr, .data-table--params td {
+    width: auto;
+  }
+  .data-table--params thead, .data-table--params tbody,
+  .data-table--params tr, .data-table--params td {
+    display: block;
+  }
+  .data-table--params thead { display: none; }
+  .data-table--params td:first-child { border-bottom: none; padding: 0.5rem 0.5rem 0.15rem; }
+  .data-table--params td:last-child { padding: 0 0.5rem 0.6rem; }
 }
 
 /* Chart curve toggle: same pill-group pattern as direction-toggle above,
