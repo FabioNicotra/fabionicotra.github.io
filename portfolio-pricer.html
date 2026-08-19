@@ -53,29 +53,36 @@
                     <div class="glass-card spot-metrics-card">
                         <h2>Price &amp; Greeks</h2>
                         <div class="spot-metrics">
-                            <div class="metric-row metric-row--primary">
+                            <div class="metric-lead">
                                 <span class="metric-label">Price</span>
                                 <span class="metric-value" id="metric-price">—</span>
                             </div>
-                            <div class="metric-row">
-                                <span class="metric-label">Delta</span>
-                                <span class="metric-value" id="metric-delta">—</span>
-                            </div>
-                            <div class="metric-row">
-                                <span class="metric-label">Gamma</span>
-                                <span class="metric-value" id="metric-gamma">—</span>
-                            </div>
-                            <div class="metric-row">
-                                <span class="metric-label">Theta (per day)</span>
-                                <span class="metric-value" id="metric-theta">—</span>
-                            </div>
-                            <div class="metric-row">
-                                <span class="metric-label">Vega (per 1% vol)</span>
-                                <span class="metric-value" id="metric-vega">—</span>
-                            </div>
-                            <div class="metric-row">
-                                <span class="metric-label">Rho (per 1% rate)</span>
-                                <span class="metric-value" id="metric-rho">—</span>
+                            <div class="metric-greeks">
+                                <div class="metric-tile">
+                                    <span class="metric-label">Delta</span>
+                                    <span class="metric-value" id="metric-delta">—</span>
+                                    <span class="metric-unit">per $1 of spot</span>
+                                </div>
+                                <div class="metric-tile">
+                                    <span class="metric-label">Gamma</span>
+                                    <span class="metric-value" id="metric-gamma">—</span>
+                                    <span class="metric-unit">delta per $1 of spot</span>
+                                </div>
+                                <div class="metric-tile">
+                                    <span class="metric-label">Theta</span>
+                                    <span class="metric-value" id="metric-theta">—</span>
+                                    <span class="metric-unit">per calendar day</span>
+                                </div>
+                                <div class="metric-tile">
+                                    <span class="metric-label">Vega</span>
+                                    <span class="metric-value" id="metric-vega">—</span>
+                                    <span class="metric-unit">per 1% of vol</span>
+                                </div>
+                                <div class="metric-tile">
+                                    <span class="metric-label">Rho</span>
+                                    <span class="metric-value" id="metric-rho">—</span>
+                                    <span class="metric-unit">per 1% of rate</span>
+                                </div>
                             </div>
                         </div>
                     </div>

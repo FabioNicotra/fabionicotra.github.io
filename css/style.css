@@ -324,57 +324,100 @@ section h2 {
 .pricer-grid { grid-template-columns: minmax(260px, 1fr) minmax(440px, 1.7fr); }
 .pricer-grid > .chart-card,
 .pricer-grid > .spot-metrics-card { grid-column: 1 / -1; }
+/* Named container so the Greeks band below steps down on this card's own
+   width, which stops tracking the viewport once the grid caps it. */
+.spot-metrics-card {
+  container-type: inline-size;
+  container-name: spot-metrics;
+}
 @media (max-width: 860px) {
   .pricer-grid { grid-template-columns: 1fr; }
 }
 
-/* Price & Greeks: a compact row list (label left, value right, hairline
-   dividers between rows) rather than a grid of equal-weight tiles --
-   Price is the headline number, Delta/Gamma/Theta are risk sensitivities
-   on it, not peers of it. Capped width so it reads as a tidy list inside
-   the full-width card instead of stretching thin across it. */
+/* Price & Greeks: price leads, the five sensitivities read as one band of
+   peers beside it. A single column stranded two thirds of this full-width
+   card empty and pushed the parameters below the fold; the band fills the
+   width the card already occupies and earns it. Price stays separated by a
+   rule rather than by color -- it's the headline the Greeks are measured
+   against, not a different kind of thing. */
 .spot-metrics {
   display: flex;
-  flex-direction: column;
-  max-width: 420px;
+  align-items: stretch;
+  gap: 1.4rem 2.25rem;
 }
-.metric-row {
+.metric-lead {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.7rem 0;
-  border-bottom: 1px solid var(--glass-border);
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.1rem;
+  padding-right: 2.25rem;
+  border-right: 1px solid var(--glass-border);
 }
-.metric-row:last-child { border-bottom: none; }
+/* Five explicit columns, not auto-fit: there are exactly five Greeks and
+   they are peers, so they hold one line wherever there is room. auto-fit
+   sized itself to the longest unit string and orphaned the fifth onto a
+   row of its own.
+
+   Stepped down by container width rather than viewport: this card spans
+   the pricer grid, so it stays its full width well after the viewport has
+   started shrinking, and a viewport breakpoint dropped it to three columns
+   while it still had room for five. */
+.metric-greeks {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1.3rem 1.5rem;
+}
+@container spot-metrics (max-width: 700px) {
+  .metric-greeks { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@container spot-metrics (max-width: 420px) {
+  .metric-greeks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Three descending shades inside a tile -- value, then what it measures,
+   then what it is measured in -- so the number is what the eye lands on
+   and the unit qualifies the label without crowding it. Tight within a
+   tile, generous between tiles: the gap does the grouping, no dividers
+   needed. */
+.metric-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
 .metric-label {
-  font-size: 0.92rem;
+  font-size: 0.82rem;
   color: var(--muted);
 }
 .metric-value {
-  font-size: 1.05rem;
+  font-size: 1.25rem;
   font-weight: 600;
   color: var(--fg);
   font-variant-numeric: tabular-nums;
   transition: color 0.35s ease;
 }
 .metric-value.is-unavailable { color: var(--muted); font-weight: 500; }
-
-/* The one row that gets the accent -- larger and bolder, same ink as the
-   rest -- so it reads as the headline the Greeks are all measured
-   relative to, without a stray color turning it into a different kind of
-   thing entirely. */
-.metric-row--primary .metric-label { color: var(--fg); font-weight: 600; }
-.metric-row--primary .metric-value {
-  font-size: 1.7rem;
-  font-weight: 700;
+.metric-unit {
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: color-mix(in srgb, var(--muted) 60%, transparent);
 }
+.metric-lead .metric-label { font-size: 0.92rem; color: var(--fg); font-weight: 600; }
+.metric-lead .metric-value { font-size: 2.1rem; font-weight: 700; }
 
-/* Price is the headline number; Delta/Gamma/Theta are risk sensitivities
-   on it, not peers of it -- only the primary tile gets the site's accent
-   color, so the Greeks stay visually secondary rather than competing. */
-.metric-tile--primary .metric-label { color: var(--accent-2); }
-.metric-tile--primary .metric-value { color: var(--accent-2); font-weight: 700; }
+/* Below the pricer grid's own single-column breakpoint the band no longer
+   has room beside the price, so the rule turns horizontal and the price
+   sits above what it leads instead of beside it. */
+@media (max-width: 860px) {
+  .spot-metrics { flex-direction: column; }
+  .metric-lead {
+    padding-right: 0;
+    padding-bottom: 1.2rem;
+    border-right: none;
+    border-bottom: 1px solid var(--glass-border);
+  }
+}
 
 .tool-loading {
   text-align: center;
