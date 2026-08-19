@@ -591,6 +591,15 @@ section h2 {
 }
 .view-toggle-btn:hover { color: var(--fg); }
 .view-toggle-btn.is-active { background: var(--accent-2); color: #fff; }
+/* A view whose metric didn't price -- dimmed and unclickable rather than
+   removed, so the set of buttons stays put instead of the row reflowing
+   under the pointer. Only color changes, which .view-toggle-btn's own
+   transition shorthand already covers. */
+.view-toggle-btn:disabled,
+.view-toggle-btn:disabled:hover {
+  color: color-mix(in srgb, var(--muted) 45%, transparent);
+  cursor: not-allowed;
+}
 
 .tool-status {
   margin-top: 1rem;

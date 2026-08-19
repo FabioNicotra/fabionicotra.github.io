@@ -7,6 +7,7 @@ from fiqua.core import (
     CalculationEngine,
     CalculationRequest,
     Metric,
+    MetricUnit,
     PricingEngineRegistry,
     Trade,
 )
@@ -14,15 +15,37 @@ from fiqua.equities import (
     EQUITY_OPTION_PRODUCT_TYPE,
     EQUITY_STRATEGY_PRODUCT_TYPE,
     BlackScholesPDEEngine,
+    BumpDirection,
     MarketData,
+    MarketDataBump,
     PDESolverSettings,
     SolvedGrid,
     StockQuote,
 )
+from numanlib.pdes import SpatiotemporalDomain1D
 
 UNDERLYING_SYMBOL = "UNDERLYING"
 TRADE_ID = "portfolio"
-METRICS = [Metric.PV, Metric.DELTA, Metric.GAMMA, Metric.THETA]
+METRICS = [Metric.PV, Metric.DELTA, Metric.GAMMA, Metric.THETA, Metric.VEGA, Metric.RHO]
+
+# Desk quoting conventions rather than the units fiqua computes in: theta
+# per year is meaningless to read next to a one-year option, and vega/rho
+# per unit of vol/rate are a hundred times the move anyone quotes. Applied
+# to the spot numbers via PricerResult.in_units() and to the curves via the
+# same MetricUnit.scale, so the axis and the headline never disagree.
+DISPLAY_UNITS = {
+    Metric.THETA: MetricUnit.PER_CALENDAR_DAY,
+    Metric.VEGA: MetricUnit.PER_PERCENT,
+    Metric.RHO: MetricUnit.PER_PERCENT,
+}
+
+# Which market factor each bumped metric differentiates against, and the
+# step to bump it by -- both matching fiqua's own bump-and-revalue defaults,
+# so a curve here lands on the number fiqua reports at spot.
+BUMPED_METRICS = (
+    (Metric.VEGA, lambda h, d: MarketDataBump.volatility(UNDERLYING_SYMBOL, h, direction=d), 1e-4),
+    (Metric.RHO, lambda h, d: MarketDataBump.rate(h, direction=d), 1e-4),
+)
 
 
 def _calculation_engine(market, settings):
@@ -74,6 +97,28 @@ def _run(engine, trade, metrics):
     return engine.run()[TRADE_ID]
 
 
+def _sensitivity_surface(engine, trade, market, bump_for, h):
+    """dV/dx over the whole solved surface, as a central difference of two
+    bumped solves.
+
+    SolvedGrid offers no vega/rho curve: fiqua reaches those by bumping and
+    repricing, which answers at spot rather than across it. Differencing
+    entire surfaces generalizes the same idea to every spot at once.
+    `engine` must be pinned to an explicit domain -- an auto-sized mesh
+    moves under a vol bump, and the two surfaces would stop lining up node
+    for node, making the subtraction meaningless.
+    """
+    solutions = []
+    for direction in (BumpDirection.ABOVE, BumpDirection.BELOW):
+        bumped = _run(
+            engine.replace(new_market=market.bump([bump_for(h, direction)])), trade, [Metric.PV]
+        )
+        if not bumped.priced:
+            raise ValueError(bumped.error_msg)
+        solutions.append(SolvedGrid.from_result(bumped).raw.solution)
+    return (solutions[0] - solutions[1]) / (2 * h)
+
+
 def price_portfolio(positions, spot, r, sigma, T, m=200, N=100, method="backward-difference", align_grid_to_strikes=True):
     try:
         market = MarketData(
@@ -89,23 +134,43 @@ def price_portfolio(positions, spot, r, sigma, T, m=200, N=100, method="backward
         priced = _run(engine, trade, METRICS)
 
         # fiqua isolates per-metric failures: a result can come back priced
-        # with some of the requested metrics missing, reported in
-        # metadata["failed_metrics"]. Every metric here backs a curve the
-        # page draws, so a partial answer is no answer.
+        # with some requested metrics missing, each explained in
+        # metadata["failed_metrics"]. Those are reported per metric rather
+        # than failing the page -- vega and rho are the ones that drop out
+        # first, on a grid too coarse to bump and reprice against. PV is the
+        # exception: without it there is no surface and no payoff to draw.
         failed = priced.metadata.get("failed_metrics", {})
-        if not priced.priced or failed:
-            return {"success": False, "error": priced.error_msg or "; ".join(failed.values())}
+        if not priced.priced or Metric.PV not in priced.values:
+            return {"success": False, "error": priced.error_msg or failed[Metric.PV.value]}
 
         # The solved surface every curve below is read off, dug out of the
         # result's own metadata -- raises if this result carries no grid
         # (e.g. legs that can't share one mesh), caught alongside the rest.
         grid = SolvedGrid.from_result(priced)
+        grid_S = grid.raw.grid_x
+        grid_t_full = grid.times
+        S_max = float(grid_S[-1])
+
+        # vega and rho have no curve on the solved grid, so each one costs a
+        # pair of bumped solves. Pinned to the base mesh by handing it an
+        # explicit domain, and skipped entirely for a metric that already
+        # failed above, since nothing would read the result.
+        pinned = _calculation_engine(
+            market,
+            PDESolverSettings(
+                domain=SpatiotemporalDomain1D(l=S_max, T=T),
+                m=len(grid_S) - 1,
+                N=len(grid_t_full) - 1,
+                method=method,
+            ),
+        )
+        surfaces = {
+            metric: _sensitivity_surface(pinned, trade, market, bump_for, h)
+            for metric, bump_for, h in BUMPED_METRICS
+            if metric in priced.values
+        }
     except (ValueError, TypeError) as e:
         return {"success": False, "error": str(e)}
-
-    grid_S = grid.raw.grid_x
-    grid_t_full = grid.times
-    S_max = float(grid_S[-1])
 
     # Payoff is pure arithmetic (no PDE involved), so evaluate it on a much
     # finer grid than the PDE's -- the PDE grid (m=200 by default) is coarse
@@ -142,20 +207,35 @@ def price_portfolio(positions, spot, r, sigma, T, m=200, N=100, method="backward
     # SolvedGrid owns every read off the solved surface: value, delta, gamma
     # and theta all come from the one grid, each an exact spline derivative
     # rather than a bump-and-reprice or a finite difference this file would
-    # otherwise have to roll itself.
-    value_grid, delta_grid, gamma_grid, theta_grid = [], [], [], []
-    for k in idx:
-        t = float(grid_t_full[k])
-        value_grid.append(grid.pv(t)(grid_S).tolist())
-        delta_grid.append(grid.delta(t)(grid_S).tolist())
-        gamma_grid.append(grid.gamma(t)(grid_S).tolist())
-        theta_grid.append(grid.theta(t)(grid_S).tolist())
+    # otherwise have to roll itself. vega and rho are the two it has no
+    # curve for, and come from the bumped surfaces above instead.
+    curve_sources = {
+        Metric.PV: lambda t, k: grid.pv(t)(grid_S),
+        Metric.DELTA: lambda t, k: grid.delta(t)(grid_S),
+        Metric.GAMMA: lambda t, k: grid.gamma(t)(grid_S),
+        Metric.THETA: lambda t, k: grid.theta(t)(grid_S),
+        Metric.VEGA: lambda t, k: surfaces[Metric.VEGA][:, k],
+        Metric.RHO: lambda t, k: surfaces[Metric.RHO][:, k],
+    }
+    grids = {
+        metric.value: [
+            (curve(float(grid_t_full[k]), k) * DISPLAY_UNITS.get(metric, MetricUnit.NATIVE).scale).tolist()
+            for k in idx
+        ]
+        for metric, curve in curve_sources.items()
+        if metric in priced.values
+    }
 
     # Spot Greeks come straight from fiqua's own metrics rather than this
     # file re-deriving them from the grid -- more accurate (fiqua spline-
     # interpolates PV and derives delta/gamma/theta at the exact spot) and
-    # the whole point of requesting them above.
-    spot_payoff = sum(pos.quantity * pos.instrument.payoff(spot) for pos, _ in legs)
+    # the whole point of requesting them above. in_units() converts without
+    # touching the values the engine computed, so nothing scaled ever gets
+    # fed back into a request.
+    spot_metrics = {
+        metric.value: metric_value.value
+        for metric, metric_value in priced.in_units(DISPLAY_UNITS).items()
+    }
 
     return {
         "success": True,
@@ -163,14 +243,7 @@ def price_portfolio(positions, spot, r, sigma, T, m=200, N=100, method="backward
         "fine_grid_S": fine_grid_S.tolist(),
         "payoff_curve": payoff_curve,
         "grid_t": grid_t,
-        "value_grid": value_grid,
-        "delta_grid": delta_grid,
-        "gamma_grid": gamma_grid,
-        "theta_grid": theta_grid,
+        "grids": grids,
+        "spot": spot_metrics,
         "S_max": S_max,
-        "spot_value": float(priced.values[Metric.PV]),
-        "spot_delta": float(priced.values[Metric.DELTA]),
-        "spot_gamma": float(priced.values[Metric.GAMMA]),
-        "spot_theta": float(priced.values[Metric.THETA]),
-        "spot_payoff": spot_payoff,
     }

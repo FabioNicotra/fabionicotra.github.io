@@ -44,6 +44,8 @@
                             <button type="button" class="view-toggle-btn" data-view="delta">Delta</button>
                             <button type="button" class="view-toggle-btn" data-view="gamma">Gamma</button>
                             <button type="button" class="view-toggle-btn" data-view="theta">Theta</button>
+                            <button type="button" class="view-toggle-btn" data-view="vega">Vega</button>
+                            <button type="button" class="view-toggle-btn" data-view="rho">Rho</button>
                         </div>
                         <div id="plot"></div>
                     </div>
@@ -64,8 +66,16 @@
                                 <span class="metric-value" id="metric-gamma">—</span>
                             </div>
                             <div class="metric-row">
-                                <span class="metric-label">Theta</span>
+                                <span class="metric-label">Theta (per day)</span>
                                 <span class="metric-value" id="metric-theta">—</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">Vega (per 1% vol)</span>
+                                <span class="metric-value" id="metric-vega">—</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">Rho (per 1% rate)</span>
+                                <span class="metric-value" id="metric-rho">—</span>
                             </div>
                         </div>
                     </div>
@@ -277,38 +287,57 @@
             let lastCommon = null;
             let lastData = null;
 
+            // Both maps are keyed by fiqua's own metric names, the same keys
+            // price_portfolio() returns its spot numbers and curves under --
+            // so a metric that failed to price is simply an absent key, and
+            // its number dashes and its view disables without either side
+            // needing a list of what can fail.
             const SPOT_METRICS = [
-                { id: "metric-price", key: "spot_value" },
-                { id: "metric-delta", key: "spot_delta" },
-                { id: "metric-gamma", key: "spot_gamma" },
-                { id: "metric-theta", key: "spot_theta" },
+                { id: "metric-price", key: "pv" },
+                { id: "metric-delta", key: "delta" },
+                { id: "metric-gamma", key: "gamma" },
+                { id: "metric-theta", key: "theta" },
+                { id: "metric-vega", key: "vega" },
+                { id: "metric-rho", key: "rho" },
             ];
 
             const CURVE_VIEWS = {
                 value: {
-                    dataKey: "value_grid",
+                    dataKey: "pv",
                     label: "Portfolio value",
                     yTitle: "Value / payoff",
                     title: "Portfolio Value & Payoff vs. Spot Price",
                     showPayoff: true,
                 },
                 delta: {
-                    dataKey: "delta_grid",
+                    dataKey: "delta",
                     label: "Portfolio delta",
                     yTitle: "Delta",
                     title: "Portfolio Delta vs. Spot Price",
                 },
                 gamma: {
-                    dataKey: "gamma_grid",
+                    dataKey: "gamma",
                     label: "Portfolio gamma",
                     yTitle: "Gamma",
                     title: "Portfolio Gamma vs. Spot Price",
                 },
                 theta: {
-                    dataKey: "theta_grid",
+                    dataKey: "theta",
                     label: "Portfolio theta",
-                    yTitle: "Theta",
+                    yTitle: "Theta (per calendar day)",
                     title: "Portfolio Theta vs. Spot Price",
+                },
+                vega: {
+                    dataKey: "vega",
+                    label: "Portfolio vega",
+                    yTitle: "Vega (per 1% of volatility)",
+                    title: "Portfolio Vega vs. Spot Price",
+                },
+                rho: {
+                    dataKey: "rho",
+                    label: "Portfolio rho",
+                    yTitle: "Rho (per 1% of rate)",
+                    title: "Portfolio Rho vs. Spot Price",
                 },
             };
 
@@ -682,9 +711,33 @@
 
                 SPOT_METRICS.forEach(({ id, key }) => {
                     const el = document.getElementById(id);
-                    el.textContent = data[key].toFixed(4);
-                    el.classList.remove("is-unavailable");
+                    const available = key in data.spot;
+                    el.textContent = available ? data.spot[key].toFixed(4) : "—";
+                    el.classList.toggle("is-unavailable", !available);
                 });
+
+                // A metric that didn't price has no curve either, so its
+                // view is disabled rather than left clickable on a stale
+                // one. If it was the view on screen, fall back to Value --
+                // always present, since a run without it fails outright.
+                const isAvailable = (view) =>
+                    CURVE_VIEWS[view].dataKey in data.grids;
+                document
+                    .querySelectorAll("#curveToggle .view-toggle-btn")
+                    .forEach((btn) => {
+                        btn.disabled = !isAvailable(btn.dataset.view);
+                    });
+                if (!isAvailable(currentView)) {
+                    currentView = "value";
+                    document
+                        .querySelectorAll("#curveToggle .view-toggle-btn")
+                        .forEach((b) =>
+                            b.classList.toggle(
+                                "is-active",
+                                b.dataset.view === currentView,
+                            ),
+                        );
+                }
 
                 lastCommon = common;
                 lastData = data;
@@ -804,7 +857,7 @@
                 };
 
                 const viewConfig = CURVE_VIEWS[view];
-                const metricFrames = data[viewConfig.dataKey].map((row) =>
+                const metricFrames = data.grids[viewConfig.dataKey].map((row) =>
                     row.slice(0, valueEnd),
                 );
                 const metricTrace = {
