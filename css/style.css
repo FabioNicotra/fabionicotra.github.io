@@ -529,6 +529,32 @@ section h2 {
 .row-action--remove { color: var(--danger); }
 .row-action--add { color: var(--success); }
 
+/* Touch: these tables were sized for a mouse, where a 30px input and a
+   24px pill are comfortable targets. On a coarse pointer they are not, so
+   every control in them grows to the 44px floor. Direction pills grow only
+   vertically -- they sit two-abreast in the narrowest column on the page,
+   and widening them would push the table back past the viewport the mobile
+   column rules above just rescued. A 19x44 target with a visible mark
+   smaller than its hit area is the trade; two adjacent pills still never
+   overlap. */
+@media (pointer: coarse) {
+  .data-table input[type="number"],
+  .data-table input[type="text"],
+  .data-table select {
+    min-height: 44px;
+  }
+  .direction-btn { min-height: 44px; }
+  .row-action { width: 44px; height: 44px; }
+}
+/* The very narrowest phones cannot spend 44px on the action column without
+   pushing the table into its own horizontal scroll, which would leave the
+   add and remove controls half off-screen on first paint. Height -- the
+   dimension a thumb actually misses on -- stays at the floor; only the
+   width gives, and still gains on the 30px it started from. */
+@media (pointer: coarse) and (max-width: 360px) {
+  .row-action { width: 38px; }
+}
+
 /* Row add/remove micro-animation: opacity + slight vertical slide. */
 #tableBody tr {
   transition: opacity 0.25s ease, transform 0.25s ease;
@@ -613,6 +639,7 @@ section h2 {
    but neutral (accent-2) since Value/Delta aren't a long/short pair. */
 .view-toggle {
   display: inline-flex;
+  flex-wrap: wrap;
   border-radius: 999px;
   background: color-mix(in srgb, var(--glass-bg) 70%, transparent);
   border: 1px solid var(--glass-border);
@@ -642,6 +669,31 @@ section h2 {
 .view-toggle-btn:disabled:hover {
   color: color-mix(in srgb, var(--muted) 45%, transparent);
   cursor: not-allowed;
+}
+
+/* Six curve views do not fit one line on a phone: the row forced the layout
+   viewport wider than the screen and pushed the last view off the edge.
+   Below this width the group becomes a three-up grid filling the card, so
+   every view stays visible -- and visibly disabled when its metric did not
+   price -- rather than scrolling out of reach. The stadium radius relaxes
+   to a rounded rect, since a pill wrapping onto two rows reads as a
+   mistake. */
+@media (max-width: 640px) {
+  .view-toggle--grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-radius: 18px;
+  }
+}
+
+/* A 28px pill is a comfortable mouse target and an uncomfortable thumb.
+   Keyed to pointer type, not viewport width: a touch laptop needs the same
+   target a phone does, and a phone in landscape is still a thumb. */
+@media (pointer: coarse) {
+  .view-toggle-btn {
+    min-height: 44px;
+    padding: 0.55rem 0.95rem;
+  }
 }
 
 .tool-status {
