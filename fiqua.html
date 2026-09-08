@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Derivative Pricing Library — Fabio Nicotra</title>
+        <link rel="stylesheet" href="css/style.css" />
+    </head>
+    <body>
+        <nav class="topnav">
+            <a class="brand" href="index.html">Fabio Nicotra</a>
+            <div class="topnav-links">
+                <a href="index.html#about">About</a>
+                <a href="index.html#work">Work</a>
+                <a href="index.html#skills">Skills</a>
+                <a href="index.html#contact">Contact</a>
+            </div>
+        </nav>
+
+        <main>
+            <section class="page-hero">
+                <a href="index.html#work" class="section-back">← Work</a>
+                <p class="eyebrow reveal">Quant Finance</p>
+                <h1 class="reveal">Derivative Pricing Library</h1>
+                <p class="hero-sub reveal">
+                    An options-pricing library built in layers: instruments,
+                    pricing engines, and a batch valuation pipeline that shares
+                    work instead of repeating it.
+                </p>
+            </section>
+
+            <section class="content">
+                <div class="prose reveal">
+                    <h2>Overview</h2>
+                    <p>
+                        This is a quantitative finance library built on top of
+                        my
+                        <a href="numerical-methods.html"
+                            >numerical methods library</a
+                        >, covering equity option pricing, Greeks, implied
+                        volatility, and valuation of a batch of trades at once.
+                        It's a portfolio project, built in layers that are each
+                        independently testable. Equities came first, and the
+                        core underneath is built to hold a second asset class
+                        later, such as interest rate products under a short-rate
+                        model, without needing to be reshaped.
+                    </p>
+                </div>
+
+                <div class="prose reveal">
+                    <h2>Architecture</h2>
+                    <p>
+                        Every instrument is routed to a pricing engine, priced
+                        under a chosen market model, and the result is assembled
+                        and handed back. This sequence is written generically,
+                        with equities plugged in through the same shared
+                        registrations any future asset class would use, so a
+                        bond or a rate product could go through it too.
+                    </p>
+                    <p>
+                        Two pricing engines exist for the same option: a
+                        closed-form formula and a numerical solve of the pricing
+                        equation by finite differences. Both are registered as
+                        alternates for the same product, so a trade can be
+                        priced by either, and running both against one contract
+                        is how each is checked against the other. Routing can be
+                        set per metric rather than per trade: one Greek can come
+                        from the closed-form engine while another is read off
+                        the numerical solution, or any single metric can be
+                        forced onto a bump-and-reprice approach regardless of
+                        what its engine would otherwise compute directly.
+                    </p>
+                    <p>
+                        A batch of trades is priced together rather than one at
+                        a time. Every trade is resolved first, its requested
+                        metrics are split across whichever engines they're
+                        routed to, each engine prices its whole share of the
+                        batch in one pass, and the results are stitched back
+                        into a single row per trade. A trade that depends on
+                        more than one engine fails as a whole if any of them
+                        fails. An engine is built the first time a trade needs
+                        it and reused for the rest of the batch, with shared
+                        calculations cached rather than repeated.
+                    </p>
+                </div>
+
+                <div class="prose reveal">
+                    <h2>Demos</h2>
+                    <div class="work-grid">
+                        <div class="glass-card">
+                            <h3>Options Portfolio Pricer</h3>
+                            <p>
+                                Build a portfolio of options on a single
+                                underlying and see its value, payoff, and Greeks
+                                against the spot price as time moves toward
+                                expiry, priced through the library's numerical
+                                pricing engine end to end.
+                            </p>
+                            <a href="portfolio-pricer.html" class="card-link"
+                                >Open demo →</a
+                            >
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <footer class="site-footer">
+                <p>
+                    &copy; <span id="year"></span> Fabio Nicotra. All rights
+                    reserved.
+                </p>
+            </footer>
+        </main>
+
+        <script src="js/main.js"></script>
+    </body>
+</html>
