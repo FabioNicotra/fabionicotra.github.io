@@ -74,22 +74,6 @@ BUMPED_METRICS = (
 )
 
 
-def _rate_curve(r):
-    """A flat curve at `r`, quoted as a continuously-compounded zero rate --
-    so `get_rate().convert_to(CONTINUOUS)` is a no-op and `r` reaches
-    Black-Scholes unchanged. Spans well past this page's own T range, and
-    extrapolates flat past that (rather than the RateCurve default of
-    raising), since T can go as low as 0.01y, below Tenor.M1's own 1/12y."""
-    return RateCurve(
-        curve_id=CURVE_ID,
-        points={tenor: r for tenor in (Tenor.M1, Tenor.M3, Tenor.Y1, Tenor.Y5, Tenor.Y10, Tenor.Y30)},
-        as_of=VALUATION_DATE,
-        compounding=CompoundingFrequency.CONTINUOUS,
-        rate_kind=RateKind.ZERO,
-        extrapolation=Extrapolation.FLAT,
-    )
-
-
 class SnapshotMarketDataProvider(MarketDataProvider):
     """Hands a CalculationEngine a MarketData snapshot this page already
     built, rather than fetching it live.
@@ -139,57 +123,6 @@ def _mdp_for(market):
     return mdp
 
 
-def _calculation_engine(market, settings):
-    """A CalculationEngine that prices a multi-leg equity strategy on the
-    finite-difference engine, solving with `settings`.
-
-    Its own registry rather than fiqua's shared one: this page's grid
-    controls *are* a PDESolverSettings, and only a registration carries
-    constructor kwargs through to the engine CalculationEngine builds for
-    itself -- the shared registration would take the PDE engine's defaults.
-    """
-    engines = PricingEngineRegistry()
-    engines.register(
-        EQUITY_STRATEGY_PRODUCT_TYPE, BlackScholesPDEEngine, default=True, settings=settings
-    )
-    return CalculationEngine(VALUATION_DATE, engines=engines, mdp=_mdp_for(market))
-
-
-def _portfolio_trade(positions, T):
-    """The whole portfolio booked as one multi-leg trade, in the shape
-    fiqua's product resolver turns into a CompositeInstrument -- so this
-    file never constructs an instrument itself."""
-    expiry_date = (VALUATION_DATE + timedelta(days=round(T * 365))).isoformat()
-    return Trade(
-        trade_id=TRADE_ID,
-        product_type=EQUITY_STRATEGY_PRODUCT_TYPE,
-        quantity=1,
-        terms={
-            "legs": [
-                {
-                    "product_type": EQUITY_OPTION_PRODUCT_TYPE,
-                    "quantity": p["quantity"],
-                    "terms": {
-                        "underlying": UNDERLYING_SYMBOL,
-                        "currency": CURRENCY,
-                        "strike": p["strike"],
-                        "expiry_date": expiry_date,
-                        "option_type": p["type"],
-                    },
-                }
-                for p in positions
-            ]
-        },
-    )
-
-
-def _run(engine, trade, metrics):
-    """`metrics` for `trade`, through CalculationEngine's queue-then-run
-    surface -- the one entry point every request on this page goes through."""
-    engine.add([Valuation(trade=trade, metrics=metrics)])
-    return engine.run()[TRADE_ID]
-
-
 def _sensitivity_surface(settings, trade, market, bump_for, h):
     """dV/dx over the whole solved surface, as a central difference of two
     bumped solves.
@@ -206,8 +139,15 @@ def _sensitivity_surface(settings, trade, market, bump_for, h):
     solutions = []
     for direction in (BumpDirection.ABOVE, BumpDirection.BELOW):
         bumped_market = market.bump([bump_for(h, direction)])
-        bumped_engine = _calculation_engine(bumped_market, settings)
-        bumped = _run(bumped_engine, trade, [Metric.PV])
+
+        engines = PricingEngineRegistry()
+        engines.register(
+            EQUITY_STRATEGY_PRODUCT_TYPE, BlackScholesPDEEngine, default=True, settings=settings
+        )
+        bumped_engine = CalculationEngine(VALUATION_DATE, engines=engines, mdp=_mdp_for(bumped_market))
+        bumped_engine.add([Valuation(trade=trade, metrics=[Metric.PV])])
+        bumped = bumped_engine.run()[TRADE_ID]
+
         if not bumped.priced:
             raise ValueError(bumped.error_msg)
         solutions.append(SolvedGrid.from_result(bumped).raw.solution)
@@ -216,19 +156,55 @@ def _sensitivity_surface(settings, trade, market, bump_for, h):
 
 def price_portfolio(positions, spot, r, sigma, T, m=200, N=100, method="backward-difference", align_grid_to_strikes=True):
     try:
+        rate_curve = RateCurve(
+            curve_id=CURVE_ID,
+            points={tenor: r for tenor in (Tenor.M1, Tenor.M3, Tenor.Y1, Tenor.Y5, Tenor.Y10, Tenor.Y30)},
+            as_of=VALUATION_DATE,
+            compounding=CompoundingFrequency.CONTINUOUS,
+            rate_kind=RateKind.ZERO,
+            extrapolation=Extrapolation.FLAT,
+        )
         market = MarketData(
             quotes={UNDERLYING_SYMBOL: StockQuote(spot=spot, currency=CURRENCY)},
             volatility_quotes={UNDERLYING_SYMBOL: VolatilityQuote(sigma)},
-            rate_curves={CURVE_ID: _rate_curve(r)},
+            rate_curves={CURVE_ID: rate_curve},
         )
-        trade = _portfolio_trade(positions, T)
-        engine = _calculation_engine(
-            market,
-            PDESolverSettings(
+
+        expiry_date = (VALUATION_DATE + timedelta(days=round(T * 365))).isoformat()
+        trade = Trade(
+            trade_id=TRADE_ID,
+            product_type=EQUITY_STRATEGY_PRODUCT_TYPE,
+            quantity=1,
+            terms={
+                "legs": [
+                    {
+                        "product_type": EQUITY_OPTION_PRODUCT_TYPE,
+                        "quantity": p["quantity"],
+                        "terms": {
+                            "underlying": UNDERLYING_SYMBOL,
+                            "currency": CURRENCY,
+                            "strike": p["strike"],
+                            "expiry_date": expiry_date,
+                            "option_type": p["type"],
+                        },
+                    }
+                    for p in positions
+                ]
+            },
+        )
+
+        engines = PricingEngineRegistry()
+        engines.register(
+            EQUITY_STRATEGY_PRODUCT_TYPE,
+            BlackScholesPDEEngine,
+            default=True,
+            settings=PDESolverSettings(
                 m=int(m), N=int(N), method=method, align_grid_to_strikes=bool(align_grid_to_strikes)
             ),
         )
-        priced = _run(engine, trade, METRICS)
+        engine = CalculationEngine(VALUATION_DATE, engines=engines, mdp=_mdp_for(market))
+        engine.add([Valuation(trade=trade, metrics=METRICS)])
+        priced = engine.run()[TRADE_ID]
 
         # fiqua isolates per-metric failures: a result can come back priced
         # with some requested metrics missing, each explained in
