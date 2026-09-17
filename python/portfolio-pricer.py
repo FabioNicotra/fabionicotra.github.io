@@ -28,10 +28,10 @@ UNDERLYING_SYMBOL = "UNDERLYING"
 TRADE_ID = "portfolio"
 METRICS = [Metric.PV, Metric.DELTA, Metric.GAMMA, Metric.THETA, Metric.VEGA, Metric.RHO]
 
-# Desk quoting conventions rather than the units fiqua computes in: theta
-# per year is meaningless to read next to a one-year option, and vega/rho
-# per unit of vol/rate are a hundred times the move anyone quotes. Applied
-# to the spot numbers via PricerResult.in_units() and to the curves via the
+# Desk quoting conventions, not the units fiqua computes in: theta per
+# year is meaningless to read next to a one-year option, and vega/rho per
+# unit of vol/rate are a hundred times the move anyone quotes. Applied to
+# the spot numbers via PricerResult.in_units() and to the curves via the
 # same MetricUnit.scale, so the axis and the headline never disagree.
 DISPLAY_UNITS = {
     Metric.THETA: MetricUnit.PER_CALENDAR_DAY,
@@ -52,10 +52,10 @@ def _calculation_engine(market, settings):
     """A CalculationEngine that prices a multi-leg equity strategy on the
     finite-difference engine, solving with `settings`.
 
-    Its own registry rather than fiqua's shared one: this page's grid
-    controls *are* a PDESolverSettings, and only a registration carries
+    Builds a page-local PricingEngineRegistry for it: this page's grid
+    controls are a PDESolverSettings, and only a registration carries
     constructor kwargs through to the engine CalculationEngine builds for
-    itself -- the shared registration would take the PDE engine's defaults.
+    itself.
     """
     engines = PricingEngineRegistry()
     engines.register(
@@ -102,8 +102,8 @@ def _sensitivity_surface(engine, trade, market, bump_for, h):
     bumped solves.
 
     SolvedGrid offers no vega/rho curve: fiqua reaches those by bumping and
-    repricing, which answers at spot rather than across it. Differencing
-    entire surfaces generalizes the same idea to every spot at once.
+    repricing, which answers only at spot. Differencing entire surfaces
+    generalizes the same idea to every spot at once.
     `engine` must be pinned to an explicit domain -- an auto-sized mesh
     moves under a vol bump, and the two surfaces would stop lining up node
     for node, making the subtraction meaningless.
@@ -177,8 +177,8 @@ def price_portfolio(positions, spot, r, sigma, T, m=200, N=100, method="backward
     # enough that payoff's kinks look jagged, unlike the value curve, which
     # is smooth by construction and doesn't need this. Strikes are folded
     # into the grid explicitly (union1d sorts + dedupes) so each kink lands
-    # exactly on an evaluated point instead of being rounded off to
-    # whichever linspace point happens to land nearby.
+    # exactly on an evaluated point, never rounded off to whichever linspace
+    # point happens to land nearby.
     #
     # The legs come back as per-leg attribution on the priced result, so the
     # payoff is summed over the same instruments fiqua resolved and priced,
@@ -205,10 +205,9 @@ def price_portfolio(positions, spot, r, sigma, T, m=200, N=100, method="backward
     grid_t = [float(grid_t_full[j]) for j in idx]
 
     # SolvedGrid owns every read off the solved surface: value, delta, gamma
-    # and theta all come from the one grid, each an exact spline derivative
-    # rather than a bump-and-reprice or a finite difference this file would
-    # otherwise have to roll itself. vega and rho are the two it has no
-    # curve for, and come from the bumped surfaces above instead.
+    # and theta all come from the one grid, each an exact spline derivative.
+    # vega and rho are the two it has no curve for, and come from the
+    # bumped surfaces above.
     curve_sources = {
         Metric.PV: lambda t, k: grid.pv(t)(grid_S),
         Metric.DELTA: lambda t, k: grid.delta(t)(grid_S),
@@ -226,12 +225,11 @@ def price_portfolio(positions, spot, r, sigma, T, m=200, N=100, method="backward
         if metric in priced.values
     }
 
-    # Spot Greeks come straight from fiqua's own metrics rather than this
-    # file re-deriving them from the grid -- more accurate (fiqua spline-
-    # interpolates PV and derives delta/gamma/theta at the exact spot) and
-    # the whole point of requesting them above. in_units() converts without
-    # touching the values the engine computed, so nothing scaled ever gets
-    # fed back into a request.
+    # Spot Greeks come straight from fiqua's own metrics: fiqua spline-
+    # interpolates PV and derives delta/gamma/theta at the exact spot, more
+    # accurate than this file re-deriving them from the grid. in_units()
+    # converts without touching the values the engine computed, so nothing
+    # scaled ever gets fed back into a request.
     spot_metrics = {
         metric.value: metric_value.value
         for metric, metric_value in priced.in_units(DISPLAY_UNITS).items()
