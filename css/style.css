@@ -482,7 +482,7 @@ section h2 {
 
 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
-.data-table input[type="number"], .data-table input[type="text"], .data-table select {
+.data-table input[type="number"], .data-table input[type="text"], .data-table input[type="date"], .data-table select {
   width: 100%;
   background: transparent;
   color: var(--fg);
@@ -494,12 +494,12 @@ section h2 {
   font-size: 0.92rem;
   transition: border-color 0.2s ease, color 0.35s ease;
 }
-.data-table input[type="number"]:focus, .data-table input[type="text"]:focus, .data-table select:focus {
+.data-table input[type="number"]:focus, .data-table input[type="text"]:focus, .data-table input[type="date"]:focus, .data-table select:focus {
   outline: none;
   border-bottom-color: var(--accent-2);
 }
-.data-table input[type="number"]:hover, .data-table input[type="text"]:hover, .data-table select:hover { border-bottom-color: var(--accent-3); }
-.data-table select { color-scheme: light dark; }
+.data-table input[type="number"]:hover, .data-table input[type="text"]:hover, .data-table input[type="date"]:hover, .data-table select:hover { border-bottom-color: var(--accent-3); }
+.data-table select, .data-table input[type="date"] { color-scheme: light dark; }
 
 /* data-table--params' value column sizes to its narrowest rows (plain
    numbers, the On/Off toggle) under table auto-layout, which clips a
@@ -528,6 +528,8 @@ section h2 {
 .row-action:focus-visible { transform: scale(1.2); }
 .row-action--remove { color: var(--danger); }
 .row-action--add { color: var(--success); }
+.row-action--reset { color: var(--warning); font-size: 1.1rem; }
+.row-action--reset.is-idle { visibility: hidden; }
 
 /* Touch: these tables were sized for a mouse, where a 30px input and a
    24px pill are comfortable targets. On a coarse pointer they are not, so
@@ -540,6 +542,7 @@ section h2 {
 @media (pointer: coarse) {
   .data-table input[type="number"],
   .data-table input[type="text"],
+  .data-table input[type="date"],
   .data-table select {
     min-height: 44px;
   }
@@ -723,3 +726,101 @@ section h2 {
 .chart-card { padding: 1.25rem; }
 #plot { width: 100%; height: 460px; }
 .chart-card--tall #plot { height: 560px; }
+
+/* Curve bootstrapping: chart on top, then the securities table at the full
+   width of the page, since every security is one row of ten columns. */
+.curve-grid { grid-template-columns: 1fr; margin-bottom: 3.5rem; }
+
+/* Valuation date, price side and reset share one row above the table they
+   act on; on a phone they wrap onto as many lines as they need. */
+.table-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.5rem;
+  margin-bottom: 1rem;
+}
+.table-toolbar .view-toggle { margin-bottom: 0; }
+.toolbar-field {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.toolbar-field select {
+  background: transparent;
+  color: var(--fg);
+  color-scheme: light dark;
+  border: none;
+  border-bottom: 1.5px solid var(--glass-border);
+  padding: 0.4rem 0.25rem;
+  font-family: inherit;
+  font-size: 0.92rem;
+  transition: border-color 0.2s ease, color 0.35s ease;
+}
+.toolbar-field select:focus { outline: none; border-bottom-color: var(--accent-2); }
+.toolbar-field select:hover { border-bottom-color: var(--accent-3); }
+@media (pointer: coarse) {
+  .toolbar-field select { min-height: 44px; }
+}
+
+/* Securities: wide enough for ten columns, scrolled inside .table-scroll on
+   a phone instead of squeezed. Numbers are right-aligned so their decimals
+   line up down a column. */
+.data-table--securities { table-layout: fixed; min-width: 860px; font-size: 0.88rem; }
+.data-table--securities th:nth-child(1), .data-table--securities td:nth-child(1) { width: 6.5%; }
+.data-table--securities th:nth-child(2), .data-table--securities td:nth-child(2) { width: 11%; }
+.data-table--securities th:nth-child(3), .data-table--securities td:nth-child(3) { width: 7%; }
+.data-table--securities th:nth-child(4), .data-table--securities td:nth-child(4) { width: 8%; }
+.data-table--securities th:nth-child(5), .data-table--securities td:nth-child(5) { width: 13.5%; }
+.data-table--securities th:nth-child(6), .data-table--securities td:nth-child(6),
+.data-table--securities th:nth-child(7), .data-table--securities td:nth-child(7),
+.data-table--securities th:nth-child(8), .data-table--securities td:nth-child(8) { width: 12.5%; }
+.data-table--securities th:nth-child(9), .data-table--securities td:nth-child(9) { width: 9%; }
+.data-table--securities th:last-child, .data-table--securities td:last-child { width: 7.5%; white-space: nowrap; }
+.data-table--securities td { padding: 0.35rem 0.3rem; }
+.data-table--securities input[type="number"] { text-align: right; font-variant-numeric: tabular-nums; }
+.data-table--securities .cell-id { font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
+.data-table--securities .cell-zero { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* A value changed from its snapshot: tinted and underlined in the warning
+   color, with the snapshot value in the cell's title. */
+.data-table td.is-edited { background: color-mix(in srgb, var(--warning) 12%, transparent); }
+.data-table td.is-edited input,
+.data-table td.is-edited select { border-bottom-color: var(--warning); }
+
+/* A security left out of the curve, with the reason in its result cell. */
+.data-table tr.is-excluded td { color: var(--muted); }
+.data-table tr.is-excluded .cell-zero { color: var(--warning); font-size: 0.78rem; text-align: left; }
+
+/* Adding a security sits below the table, not in its footer, so it stays
+   on screen while the table scrolls sideways on a phone. Its input wears
+   the table's input styling. */
+.add-security {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-top: 1rem;
+}
+.add-security-cusip { display: flex; align-items: center; gap: 0.25rem; }
+.add-security-cusip input[type="text"] {
+  width: 11rem;
+  background: transparent;
+  color: var(--fg);
+  border: none;
+  border-bottom: 1.5px solid var(--glass-border);
+  border-radius: 0;
+  padding: 0.4rem 0.25rem;
+  font-family: inherit;
+  font-size: 0.92rem;
+  text-transform: uppercase;
+  transition: border-color 0.2s ease, color 0.35s ease;
+}
+.add-security-cusip input[type="text"]::placeholder { text-transform: none; color: var(--muted); }
+.add-security-cusip input[type="text"]:focus { outline: none; border-bottom-color: var(--accent-2); }
+.add-security-cusip input[type="text"]:hover { border-bottom-color: var(--accent-3); }
+@media (pointer: coarse) {
+  .add-security-cusip input[type="text"] { min-height: 44px; }
+}
