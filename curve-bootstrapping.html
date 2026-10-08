@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Treasury Curve Bootstrapping — Fabio Nicotra</title>
+        <link rel="stylesheet" href="css/style.css" />
+        <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/pyodide/v0.26.1/full/pyodide.js"></script>
+    </head>
+    <body>
+        <nav class="topnav">
+            <a class="brand" href="index.html">Fabio Nicotra</a>
+            <div class="topnav-links">
+                <a href="index.html#about">About</a>
+                <a href="index.html#work">Work</a>
+                <a href="index.html#skills">Skills</a>
+                <a href="index.html#contact">Contact</a>
+            </div>
+        </nav>
+
+        <main>
+            <section class="page-hero">
+                <a href="fiqua.html" class="section-back">← Derivative Pricing Library</a>
+                <p class="eyebrow reveal">Interactive Demo</p>
+                <h1 class="reveal">Treasury Curve Bootstrapping</h1>
+                <p class="hero-sub reveal">
+                    Bootstrap a U.S. Treasury discount curve from the on-the-run
+                    bills, notes and bonds priced on a day you pick. Change any
+                    price or term, or add a security, and see the zero, forward
+                    and par yield curves move.
+                </p>
+            </section>
+
+            <section class="content">
+                <div id="loading" class="glass-card tool-loading reveal">
+                    <div class="spinner"></div>
+                    <p id="loadingText">Loading…</p>
+                </div>
+
+                <div id="app" class="tool-grid curve-grid reveal" style="display: none">
+                    <div class="glass-card chart-card chart-card--tall">
+                        <div class="view-toggle" id="scaleToggle" role="group" aria-label="Maturity axis">
+                            <button type="button" class="view-toggle-btn is-active" data-scale="linear">Linear</button>
+                            <button type="button" class="view-toggle-btn" data-scale="log">Log</button>
+                        </div>
+                        <div id="plot"></div>
+                    </div>
+
+                    <div class="glass-card">
+                        <h2>Securities</h2>
+                        <div class="table-toolbar">
+                            <label class="toolbar-field" for="inp-date">
+                                Valuation date
+                                <select id="inp-date"></select>
+                            </label>
+                            <div class="toolbar-field">
+                                Price
+                                <div class="view-toggle" id="sideToggle" role="group" aria-label="Price side">
+                                    <button type="button" class="view-toggle-btn" data-side="bid">Bid</button>
+                                    <button type="button" class="view-toggle-btn" data-side="ask">Ask</button>
+                                    <button type="button" class="view-toggle-btn is-active" data-side="mid">Mid</button>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-small" id="resetAll">Reset all</button>
+                        </div>
+                        <div class="table-scroll">
+                            <table class="data-table data-table--securities">
+                                <thead>
+                                    <tr>
+                                        <th>Tenor</th>
+                                        <th>CUSIP</th>
+                                        <th>Type</th>
+                                        <th>Coupon %</th>
+                                        <th>Maturity</th>
+                                        <th>Bid</th>
+                                        <th>Ask</th>
+                                        <th>Last</th>
+                                        <th>Zero %</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tableBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="add-security">
+                            <div class="add-security-cusip">
+                                <input
+                                    type="text"
+                                    id="inp-cusip"
+                                    placeholder="Add by CUSIP"
+                                    aria-label="CUSIP to add"
+                                    maxlength="9"
+                                    autocomplete="off"
+                                    spellcheck="false"
+                                />
+                                <button
+                                    class="row-action row-action--add"
+                                    type="button"
+                                    id="addCusip"
+                                    aria-label="Add security by CUSIP"
+                                    title="Add security by CUSIP"
+                                >
+                                    +
+                                </button>
+                            </div>
+                            <button type="button" class="btn btn-small" id="addCustom">Add custom row</button>
+                        </div>
+                        <div id="status" class="tool-status" style="display: none"></div>
+                    </div>
+                </div>
+
+                <div class="prose reveal">
+                    <h2>How it works</h2>
+                    <p>
+                        Prices are FedInvest's end-of-day quotes, clean and per
+                        100 of face value, read from a daily snapshot of
+                        TreasuryDirect. Each security with a price on the chosen
+                        side becomes one node of the curve, at its maturity.
+                        Nodes are solved in order of maturity: each one sets the
+                        discount factor at which the security's remaining
+                        coupons and principal, discounted off the curve built so
+                        far, add up to its price plus accrued interest.
+                    </p>
+                    <p>
+                        Discount factors are interpolated log-linearly between
+                        nodes, so the instantaneous forward rate is flat between
+                        two maturities and jumps at each node. Zero rates and
+                        forwards are continuously compounded. Par yields are the
+                        semiannual coupons at which a bond issued on the
+                        valuation date and maturing at each standard tenor
+                        prices at par off the curve, the same basis as
+                        Treasury's published par yield curve.
+                    </p>
+                </div>
+            </section>
+
+            <footer class="site-footer">
+                <p>
+                    &copy; <span id="year"></span> Fabio Nicotra. All rights
+                    reserved.
+                </p>
+            </footer>
+        </main>
+
+        <script src="js/main.js"></script>
+        <script>
+            let pyodide;
+            let rows = [];
+            let valuationDate = null;
+            let side = "mid";
+            let axisScale = "linear";
+            let customCount = 0;
+            let lastResult = null;
+            let running = false;
+            let rerunRequested = false;
+
+            const EDITABLE_FIELDS = ["type", "coupon", "maturity", "bid", "ask", "last"];
+            const PRICE_FIELDS = ["bid", "ask", "last"];
+            const SIDE_FIELDS = { bid: ["bid"], ask: ["ask"], mid: ["bid", "ask"] };
+            const COMPACT_CHART = "(max-width: 640px)";
+
+            function getChartTheme() {
+                const computed = getComputedStyle(document.documentElement);
+                const token = (name) => computed.getPropertyValue(name).trim();
+                return {
+                    font: token("--fg"),
+                    muted: token("--muted"),
+                    grid: token("--grid"),
+                    zero: token("--accent-2"),
+                    forward: token("--warning"),
+                    par: token("--danger"),
+                    surface: token("--bg"),
+                };
+            }
+
+            // Every Python entry point takes and returns plain JSON, passed
+            // through a global so no value is ever spliced into source code.
+            async function callPython(name, ...args) {
+                pyodide.globals.set("call_args_json", JSON.stringify(args));
+                const resultJson = await pyodide.runPythonAsync(
+                    `json.dumps(${name}(*json.loads(call_args_json)))`,
+                );
+                return JSON.parse(resultJson);
+            }
+
+            // The mirror fetches block the main thread (Pyodide's network
+            // access is a synchronous request), so a message set right
+            // before one only shows if the browser gets to paint it first.
+            function nextPaint() {
+                return new Promise((resolve) =>
+                    requestAnimationFrame(() => requestAnimationFrame(resolve)),
+                );
+            }
+
+            async function initializePyodide() {
+                pyodide = await loadPyodide();
+                await pyodide.loadPackage(["micropip", "numpy", "matplotlib", "pandas"]);
+                const source = await fetch("python/curve-bootstrapping.py").then((r) => r.text());
+                await pyodide.runPythonAsync(source);
+                await pyodide.runPythonAsync("import json");
+
+                document.getElementById("loadingText").textContent = "Reading the Treasury snapshot…";
+                await nextPaint();
+                const listed = await callPython("list_valuation_dates");
+                if (!listed.success) throw new Error(listed.error);
+
+                const select = document.getElementById("inp-date");
+                listed.dates.forEach((day) => {
+                    const option = document.createElement("option");
+                    option.value = day;
+                    option.textContent = day;
+                    select.appendChild(option);
+                });
+                valuationDate = listed.dates[0];
+                select.value = valuationDate;
+
+                const loaded = await callPython("load_day", valuationDate);
+                if (!loaded.success) throw new Error(loaded.error);
+                setRows(loaded.rows);
+
+                document.getElementById("loading").style.display = "none";
+                document.getElementById("app").style.display = "grid";
+
+                initializeControls();
+                await runBootstrap();
+
+                [
+                    window.matchMedia("(prefers-color-scheme: dark)"),
+                    window.matchMedia(COMPACT_CHART),
+                ].forEach((query) => {
+                    query.addEventListener("change", () => {
+                        if (lastResult) renderChart(lastResult);
+                    });
+                });
+            }
+
+            function initializeControls() {
+                document.getElementById("inp-date").addEventListener("change", async (event) => {
+                    await loadDay(event.target.value);
+                });
+                document.querySelectorAll("#sideToggle .view-toggle-btn").forEach((btn) => {
+                    btn.addEventListener("click", () => {
+                        if (btn.classList.contains("is-active")) return;
+                        document
+                            .querySelectorAll("#sideToggle .view-toggle-btn")
+                            .forEach((b) => b.classList.toggle("is-active", b === btn));
+                        side = btn.dataset.side;
+                        runBootstrap();
+                    });
+                });
+                document.querySelectorAll("#scaleToggle .view-toggle-btn").forEach((btn) => {
+                    btn.addEventListener("click", () => {
+                        if (btn.classList.contains("is-active")) return;
+                        document
+                            .querySelectorAll("#scaleToggle .view-toggle-btn")
+                            .forEach((b) => b.classList.toggle("is-active", b === btn));
+                        axisScale = btn.dataset.scale;
+                        if (lastResult) renderChart(lastResult);
+                    });
+                });
+                document.getElementById("resetAll").addEventListener("click", () => loadDay(valuationDate));
+                document.getElementById("addCusip").addEventListener("click", addByCusip);
+                document.getElementById("inp-cusip").addEventListener("keydown", (event) => {
+                    if (event.key === "Enter") addByCusip();
+                });
+                document.getElementById("addCustom").addEventListener("click", addCustomRow);
+            }
+
+            async function loadDay(day) {
+                showStatus("Loading the securities priced on " + day + "…", false);
+                await nextPaint();
+                const loaded = await callPython("load_day", day);
+                if (!loaded.success) {
+                    showStatus(loaded.error, true);
+                    document.getElementById("inp-date").value = valuationDate;
+                    return;
+                }
+                valuationDate = day;
+                setRows(loaded.rows);
+                await runBootstrap();
+            }
+
+            function snapshotValues(row) {
+                const original = {};
+                EDITABLE_FIELDS.forEach((field) => (original[field] = row[field]));
+                return original;
+            }
+
+            function setRows(snapshotRows) {
+                rows = snapshotRows.map((row) => ({ ...row, original: snapshotValues(row) }));
+                renderTable();
+            }
+
+            function compareMaturity(a, b) {
+                if (!a.maturity) return 1;
+                if (!b.maturity) return -1;
+                return a.maturity.localeCompare(b.maturity);
+            }
+
+            function insertRow(row) {
+                const entry = { ...row, original: snapshotValues(row) };
+                const index = rows.findIndex((other) => compareMaturity(entry, other) < 0);
+                if (index === -1) rows.push(entry);
+                else rows.splice(index, 0, entry);
+                renderTable();
+                const tr = document.querySelector(`#tableBody tr[data-id="${entry.id}"]`);
+                tr.classList.add("row-enter");
+                requestAnimationFrame(() => requestAnimationFrame(() => tr.classList.remove("row-enter")));
+            }
+
+            async function addByCusip() {
+                const input = document.getElementById("inp-cusip");
+                const cusip = input.value.trim().toUpperCase();
+                if (!cusip) return;
+                if (rows.some((row) => row.id === cusip)) {
+                    showStatus(`${cusip} is already in the table.`, true);
+                    return;
+                }
+                const found = await callPython("lookup_cusip", cusip, valuationDate);
+                if (!found.success) {
+                    showStatus(found.error, true);
+                    return;
+                }
+                input.value = "";
+                insertRow(found.row);
+                await runBootstrap();
+            }
+
+            function addCustomRow() {
+                customCount += 1;
+                insertRow({
+                    id: `CUSTOM-${customCount}`,
+                    kind: "custom",
+                    tenor: null,
+                    type: "note",
+                    coupon: null,
+                    maturity: null,
+                    bid: null,
+                    ask: null,
+                    last: null,
+                });
+                runBootstrap();
+            }
+
+            function removeRow(id) {
+                const tr = document.querySelector(`#tableBody tr[data-id="${id}"]`);
+                rows = rows.filter((row) => row.id !== id);
+                tr.classList.add("row-leave");
+                tr.addEventListener("transitionend", () => tr.remove(), { once: true });
+                runBootstrap();
+            }
+
+            function resetRow(id) {
+                const row = rows.find((r) => r.id === id);
+                Object.assign(row, row.original);
+                const tr = document.querySelector(`#tableBody tr[data-id="${id}"]`);
+                tr.replaceWith(buildRow(row));
+                runBootstrap();
+            }
+
+            function formatValue(value) {
+                return value === null || value === undefined ? "" : String(value);
+            }
+
+            function isEdited(row, field) {
+                const value = row[field];
+                const original = row.original[field];
+                if (typeof value === "number" && typeof original === "number") {
+                    return Math.abs(value - original) > 1e-9;
+                }
+                return value !== original;
+            }
+
+            // A row's inputs and its edited marks, built from its state; the
+            // result column is filled in separately once the curve is solved.
+            function buildRow(row) {
+                const tr = document.createElement("tr");
+                tr.dataset.id = row.id;
+                const isCustom = row.kind === "custom";
+                const isBill = row.type === "bill";
+                const label = isCustom ? `Custom ${row.id.split("-")[1]}` : row.id;
+                const typeCell = isCustom
+                    ? `<select data-field="type" aria-label="Security type">
+                           ${["bill", "note", "bond"]
+                               .map((t) => `<option value="${t}" ${row.type === t ? "selected" : ""}>${t[0].toUpperCase() + t.slice(1)}</option>`)
+                               .join("")}
+                       </select>`
+                    : row.type[0].toUpperCase() + row.type.slice(1);
+                const couponCell = isBill
+                    ? "—"
+                    : `<input type="number" data-field="coupon" value="${formatValue(row.coupon)}" min="0" step="any" inputmode="decimal" aria-label="Coupon, percent">`;
+                const priceCell = (field) =>
+                    `<td data-cell="${field}"><input type="number" data-field="${field}" value="${formatValue(row[field])}" min="0" step="any" inputmode="decimal" aria-label="${field === "last" ? "Last price" : field[0].toUpperCase() + field.slice(1)}"></td>`;
+                tr.innerHTML = `
+                    <td>${row.tenor ?? "—"}</td>
+                    <td class="cell-id">${label}</td>
+                    <td data-cell="type">${typeCell}</td>
+                    <td data-cell="coupon">${couponCell}</td>
+                    <td data-cell="maturity"><input type="date" data-field="maturity" value="${formatValue(row.maturity)}" aria-label="Maturity date"></td>
+                    ${PRICE_FIELDS.map(priceCell).join("")}
+                    <td class="cell-zero">—</td>
+                    <td>
+                        <button class="row-action row-action--reset" type="button" aria-label="Reset ${label} to its snapshot values" title="Reset to snapshot">↺</button>
+                        <button class="row-action row-action--remove" type="button" aria-label="Remove ${label}" title="Remove">−</button>
+                    </td>
+                `;
+
+                tr.querySelectorAll("[data-field]").forEach((input) => {
+                    input.addEventListener("change", () => {
+                        const field = input.dataset.field;
+                        if (field === "type" || field === "maturity") {
+                            row[field] = input.value || null;
+                        } else {
+                            const value = parseFloat(input.value);
+                            row[field] = Number.isNaN(value) ? null : value;
+                        }
+                        // A bill has no coupon cell and a note needs one, so
+                        // changing a custom row's type rebuilds the row.
+                        if (field === "type") {
+                            tr.replaceWith(buildRow(row));
+                        } else {
+                            markEdits(tr, row);
+                        }
+                        runBootstrap();
+                    });
+                });
+                tr.querySelector(".row-action--reset").addEventListener("click", () => resetRow(row.id));
+                tr.querySelector(".row-action--remove").addEventListener("click", () => removeRow(row.id));
+                markEdits(tr, row);
+                if (lastResult) markResult(tr, row, lastResult);
+                return tr;
+            }
+
+            // A custom row has no snapshot to differ from, so it is never
+            // marked as edited and has nothing to reset to.
+            function markEdits(tr, row) {
+                let anyEdited = false;
+                if (row.kind === "custom") {
+                    tr.querySelector(".row-action--reset").classList.add("is-idle");
+                    return;
+                }
+                EDITABLE_FIELDS.forEach((field) => {
+                    const cell = tr.querySelector(`[data-cell="${field}"]`);
+                    const edited = isEdited(row, field);
+                    anyEdited = anyEdited || edited;
+                    if (!cell) return;
+                    cell.classList.toggle("is-edited", edited);
+                    const original = row.original[field];
+                    cell.title = edited
+                        ? `Snapshot: ${original === null ? "empty" : original}`
+                        : "";
+                });
+                tr.querySelector(".row-action--reset").classList.toggle("is-idle", !anyEdited);
+            }
+
+            function renderTable() {
+                const body = document.getElementById("tableBody");
+                body.innerHTML = "";
+                rows.forEach((row) => body.appendChild(buildRow(row)));
+            }
+
+            // Why a row is left out before Python sees it: a custom row
+            // still missing a term, or a price missing on the chosen side.
+            function getExclusion(row) {
+                if (!row.maturity) return "enter a maturity";
+                if (row.maturity <= valuationDate) return "matures by the valuation date";
+                if (row.type !== "bill" && row.coupon === null) return "enter a coupon";
+                const missing = SIDE_FIELDS[side].filter((field) => row[field] === null);
+                if (missing.length) return `no ${side} price`;
+                return null;
+            }
+
+            function markResult(tr, row, result) {
+                const zeroCell = tr.querySelector(".cell-zero");
+                const node = result.success ? result.nodeById[row.id] : null;
+                const exclusion = getExclusion(row);
+                tr.classList.toggle("is-excluded", Boolean(exclusion));
+                if (exclusion) {
+                    zeroCell.textContent = `Excluded: ${exclusion}`;
+                } else {
+                    zeroCell.textContent = node ? node.zero.toFixed(3) : "—";
+                }
+            }
+
+            function markResults(result) {
+                rows.forEach((row) => {
+                    const tr = document.querySelector(`#tableBody tr[data-id="${row.id}"]`);
+                    if (tr) markResult(tr, row, result);
+                });
+            }
+
+            function showStatus(message, isError) {
+                const statusEl = document.getElementById("status");
+                statusEl.textContent = message;
+                statusEl.classList.toggle("error", isError);
+                statusEl.style.display = "flex";
+            }
+
+            function hideStatus() {
+                document.getElementById("status").style.display = "none";
+            }
+
+            function setChartVisible(visible) {
+                document.querySelector(".chart-card").style.display = visible ? "" : "none";
+            }
+
+            // One solve at a time: an edit made while a solve is running
+            // queues a single rerun with whatever the table holds by then.
+            async function runBootstrap() {
+                if (!pyodide) return;
+                if (running) {
+                    rerunRequested = true;
+                    return;
+                }
+                running = true;
+                try {
+                    do {
+                        rerunRequested = false;
+                        await solve();
+                    } while (rerunRequested);
+                } finally {
+                    running = false;
+                }
+            }
+
+            // A row missing a price on the chosen side is still sent:
+            // fiqua's curve builder leaves it out itself. Any other
+            // exclusion can't make a valid security, so it stays here.
+            async function solve() {
+                const payload = rows
+                    .filter((row) => {
+                        const exclusion = getExclusion(row);
+                        return exclusion === null || exclusion.startsWith("no ");
+                    })
+                    .map((row) => ({
+                        id: row.id,
+                        kind: row.kind,
+                        type: row.type,
+                        coupon: row.coupon,
+                        maturity: row.maturity,
+                        bid: row.bid,
+                        ask: row.ask,
+                        last: row.last,
+                    }));
+                const result = await callPython("bootstrap", payload, valuationDate, side);
+                if (result.success) {
+                    result.nodeById = Object.fromEntries(result.nodes.map((node) => [node.id, node]));
+                }
+                lastResult = result;
+                markResults(result);
+
+                if (!result.success) {
+                    showStatus(result.error, true);
+                    setChartVisible(false);
+                    return;
+                }
+                if (result.par_error) showStatus(`Par yields: ${result.par_error}`, true);
+                else hideStatus();
+                setChartVisible(true);
+                renderChart(result);
+            }
+
+            function renderChart(result) {
+                if (!result.success) return;
+                const theme = getChartTheme();
+                const compact = window.matchMedia(COMPACT_CHART).matches;
+                const labels = Object.fromEntries(
+                    rows.map((row) => [row.id, row.kind === "custom" ? `Custom ${row.id.split("-")[1]}` : row.id]),
+                );
+                const tenorById = Object.fromEntries(rows.map((row) => [row.id, row.tenor]));
+
+                const traces = [
+                    {
+                        x: result.grid,
+                        y: result.zero,
+                        mode: "lines",
+                        name: "Zero rate",
+                        line: { color: theme.zero, width: 2.5 },
+                        hovertemplate: "t = %{x:.2f} yr<br>zero = %{y:.3f}%<extra></extra>",
+                    },
+                    {
+                        x: result.grid,
+                        y: result.forward,
+                        mode: "lines",
+                        name: "Instantaneous forward",
+                        line: { color: theme.forward, width: 1.75 },
+                        hovertemplate: "t = %{x:.2f} yr<br>forward = %{y:.3f}%<extra></extra>",
+                    },
+                    {
+                        x: result.nodes.map((node) => node.t),
+                        y: result.nodes.map((node) => node.zero),
+                        customdata: result.nodes.map((node) => [
+                            tenorById[node.id] ? `${tenorById[node.id]} · ${labels[node.id]}` : labels[node.id] ?? node.id,
+                        ]),
+                        mode: "markers",
+                        name: "Curve nodes",
+                        marker: { color: theme.zero, size: 8, line: { color: theme.surface, width: 2 } },
+                        hovertemplate: "%{customdata[0]}<br>t = %{x:.2f} yr<br>zero = %{y:.3f}%<extra></extra>",
+                    },
+                ];
+                if (result.par) {
+                    traces.push(
+                        {
+                            x: result.par.grid,
+                            y: result.par.values,
+                            mode: "lines",
+                            name: "Par yield",
+                            legendgroup: "par",
+                            line: { color: theme.par, width: 2, dash: "dash" },
+                            hovertemplate: "t = %{x:.2f} yr<br>par = %{y:.3f}%<extra></extra>",
+                        },
+                        {
+                            x: result.par.points.map((p) => p.t),
+                            y: result.par.points.map((p) => p.value),
+                            customdata: result.par.points.map((p) => [p.tenor]),
+                            mode: "markers",
+                            name: "Par yield",
+                            legendgroup: "par",
+                            showlegend: false,
+                            marker: { color: theme.par, size: 8, line: { color: theme.surface, width: 2 } },
+                            hovertemplate: "%{customdata[0]} par = %{y:.3f}%<extra></extra>",
+                        },
+                    );
+                }
+
+                const layout = {
+                    title: compact
+                        ? undefined
+                        : {
+                              text: `U.S. Treasury curve, ${valuationDate}, ${side} prices`,
+                              font: { color: theme.font },
+                              // Left of the modebar, which sits top right.
+                              x: 0,
+                              xref: "paper",
+                              xanchor: "left",
+                          },
+                    xaxis: {
+                        title: "Maturity (years)",
+                        type: axisScale,
+                        gridcolor: theme.grid,
+                        color: theme.font,
+                        zerolinecolor: theme.grid,
+                    },
+                    yaxis: {
+                        title: "Rate (%)",
+                        gridcolor: theme.grid,
+                        color: theme.font,
+                        zerolinecolor: theme.grid,
+                    },
+                    hovermode: "closest",
+                    plot_bgcolor: "transparent",
+                    paper_bgcolor: "transparent",
+                    font: { color: theme.font },
+                    legend: {
+                        font: { color: theme.font },
+                        orientation: "h",
+                        x: 0.5,
+                        xanchor: "center",
+                        y: compact ? -0.24 : -0.15,
+                    },
+                    margin: compact ? { l: 44, r: 14, t: 14, b: 110 } : { l: 60, r: 30, t: 50, b: 100 },
+                };
+                Plotly.react("plot", traces, layout, {
+                    responsive: true,
+                    displayModeBar: !compact,
+                });
+            }
+
+            initializePyodide().catch((err) => {
+                document.getElementById("loading").innerHTML =
+                    `<p style="color: var(--danger);">Error: ${err.message}</p>`;
+            });
+        </script>
+    </body>
+</html>
