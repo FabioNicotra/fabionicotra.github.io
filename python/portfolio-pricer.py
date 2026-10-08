@@ -1,5 +1,5 @@
 import micropip
-await micropip.install("fiqua==0.4.0")
+await micropip.install("fiqua==0.5.0")
 
 import json
 from datetime import date, timedelta
@@ -8,144 +8,113 @@ import numpy as np
 from fiqua.core import (
     CalculationEngine,
     CompoundingFrequency,
+    CompositeInstrument,
+    CurveId,
     Extrapolation,
     Metric,
+    MetricSpec,
     MetricUnit,
-    PricingEngineRegistry,
-    RateCurve,
-    RateKind,
+    Position,
     Tenor,
-    Trade,
+    ValuationQuery,
+    ZeroCurve,
 )
-from fiqua.core.trade_query import Valuation
-from fiqua.equities import (
-    EQUITY_OPTION_PRODUCT_TYPE,
-    EQUITY_STRATEGY_PRODUCT_TYPE,
-    BlackScholesPDEEngine,
-    BumpDirection,
-    MarketData,
-    MarketDataBump,
-    PDESolverSettings,
-    SolvedGrid,
-    StockQuote,
-    VolatilityQuote,
-)
-from fiqua.market import (
-    EQUITY_NAMESPACE,
-    RATE_NAMESPACE,
-    FetchedValue,
-    MarketDataProvider,
-    MarketDataProviderRegistry,
-    parse_identifier,
-)
+from fiqua.core.curve_id import DISC, ZERO
+from fiqua.equities import BlackScholesPDEEngine, EuropeanOption, PDESolverSettings, SolvedGrid, Stock, StockQuote
+from fiqua.market import DummyMarketDataProvider, FetchedValue, Identifier, MarketDataProviderRegistry
 from numanlib.pdes import SpatiotemporalDomain1D
 
 UNDERLYING_SYMBOL = "UNDERLYING"
-TRADE_ID = "portfolio"
 CURRENCY = "USD"
-# fiqua resolves a USD stock's rate curve under this curve_id, not "USD"
-# itself (its currency -> curve_id mapping special-cases USD to the
-# Treasury CMT curve) -- see fiqua.equities.model._curve_id_for.
-CURVE_ID = "USD.TREASURY.CMT"
+ZERO_CURVE_ID = CurveId(CURRENCY, ZERO, CurveId(CURRENCY, "FLAT"))
+DISCOUNT_CURVE_ID = CurveId(CURRENCY, DISC, ZERO_CURVE_ID)
 # Fixed once at module load (this file runs once per page load; price_portfolio
 # is called repeatedly against the same valuation date) -- purely a pricing
 # "as of" reference, since every curve point below is quoted at the same flat
 # rate regardless of tenor.
 VALUATION_DATE = date.today()
-METRICS = [Metric.PV, Metric.DELTA, Metric.GAMMA, Metric.THETA, Metric.VEGA, Metric.RHO]
+# The registry's default engine for an option is the closed form, so every
+# metric names the PDE engine: the page draws the solved grid.
+PDE_ENGINE = BlackScholesPDEEngine.name
+METRICS = [
+    MetricSpec(metric, engine=PDE_ENGINE)
+    for metric in (Metric.PV, Metric.DELTA, Metric.GAMMA, Metric.THETA, Metric.VEGA, Metric.RHO)
+]
 
 # Desk quoting conventions, not the units fiqua computes in: theta per
 # year is meaningless to read next to a one-year option, and vega/rho per
 # unit of vol/rate are a hundred times the move anyone quotes. Applied to
-# the spot numbers via PricerResult.in_units() and to the curves via the
-# same MetricUnit.scale, so the axis and the headline never disagree.
+# the spot numbers via PricerResult.convert_to_units() and to the curves via
+# the same MetricUnit.scale, so the axis and the headline never disagree.
 DISPLAY_UNITS = {
     Metric.THETA: MetricUnit.PER_CALENDAR_DAY,
     Metric.VEGA: MetricUnit.PER_PERCENT,
     Metric.RHO: MetricUnit.PER_PERCENT,
 }
 
-# Which market factor each bumped metric differentiates against, and the
-# step to bump it by -- both matching fiqua's own bump-and-revalue defaults,
-# so a curve here lands on the number fiqua reports at spot.
-BUMPED_METRICS = (
-    (Metric.VEGA, lambda h, d: MarketDataBump.volatility(UNDERLYING_SYMBOL, h, direction=d), 1e-4),
-    (Metric.RHO, lambda h, d: MarketDataBump.curve(CURVE_ID, h, direction=d), 1e-4),
-)
+# The step vega and rho are bumped by, matching fiqua's own bump-and-revalue
+# default, so a curve here lands on the number fiqua reports at spot.
+BUMP_SIZE = 1e-4
 
 
-class SnapshotMarketDataProvider(MarketDataProvider):
-    """Hands a CalculationEngine a MarketData snapshot this page already
-    built.
+def _price(instrument, metrics, settings, spot, sigma, r):
+    """The single PricerResult for `instrument` valued on a market of one
+    stock at `spot` and `sigma`, discounted off a zero curve flat at `r`.
 
-    Built entirely off fiqua's public market-data surface: parse_identifier()
-    decodes whatever identifiers the engine asks for, so this page never
-    constructs the identifier string format itself.
+    A CalculationEngine holds no market of its own, so each call builds its
+    own provider and engine; a bumped market is another call with the bumped
+    input.
     """
-
-    name = "snapshot"
-
-    def __init__(self, market, valuation_date):
-        super().__init__(valuation_date)
-        self._market = market
-
-    def fetch(self, identifiers):
-        fetched = {}
-        for identifier in identifiers:
-            kind, symbol = parse_identifier(identifier)
-            if kind == "curve":
-                if symbol in self._market.rate_curves:
-                    fetched[identifier] = FetchedValue(value=self._market.rate_curve(symbol))
-            elif kind == "spot":
-                if self._market.has_quote(symbol):
-                    quote = self._market.quote(symbol)
-                    fetched[identifier] = FetchedValue(value=quote.spot, currency=quote.currency)
-            elif kind == "dividend_yield":
-                if self._market.has_quote(symbol):
-                    quote = self._market.quote(symbol)
-                    fetched[identifier] = FetchedValue(value=quote.dividend_yield, currency=quote.currency)
-            elif kind == "volatility":
-                if symbol in self._market.volatility_quotes:
-                    fetched[identifier] = FetchedValue(value=self._market.volatility(symbol))
-        return fetched
-
-
-def _mdp_for(market):
-    """A MarketDataProviderRegistry serving `market` under both namespaces
-    this page's instruments read from -- the one place a CalculationEngine
-    learns about a market snapshot now that its constructor no longer takes
-    MarketData directly."""
-    provider = SnapshotMarketDataProvider(market, VALUATION_DATE)
+    zero_curve = ZeroCurve(
+        curve_id=ZERO_CURVE_ID,
+        points={tenor: r for tenor in (Tenor.M1, Tenor.M3, Tenor.Y1, Tenor.Y5, Tenor.Y10, Tenor.Y30)},
+        as_of=VALUATION_DATE,
+        compounding=CompoundingFrequency.CONTINUOUS,
+        extrapolation=Extrapolation.FLAT,
+    )
     mdp = MarketDataProviderRegistry()
-    mdp.register(EQUITY_NAMESPACE, provider)
-    mdp.register(RATE_NAMESPACE, provider)
-    return mdp
+    mdp.register(
+        DummyMarketDataProvider(
+            {
+                Identifier.stock_quote(UNDERLYING_SYMBOL): FetchedValue(StockQuote(spot=spot, currency=CURRENCY)),
+                Identifier.volatility(UNDERLYING_SYMBOL): FetchedValue(sigma),
+                Identifier.curve(ZERO_CURVE_ID): FetchedValue(zero_curve),
+            },
+            VALUATION_DATE,
+        )
+    )
+    engine = CalculationEngine(VALUATION_DATE, mdp=mdp)
+    engine.add(
+        [
+            ValuationQuery(
+                instrument=instrument,
+                metrics=metrics,
+                discount_curve=DISCOUNT_CURVE_ID,
+                engine_config=settings,
+            )
+        ]
+    )
+    return engine.run()[0]
 
 
-def _sensitivity_surface(settings, trade, market, bump_for, h):
+def _sensitivity_surface(settings, instrument, spot, sigma, r, bump):
     """dV/dx over the whole solved surface, as a central difference of two
     bumped solves.
 
     SolvedGrid offers no vega/rho curve: fiqua reaches those by bumping and
     repricing, which answers only at spot. Differencing entire surfaces
-    generalizes the same idea to every spot at once. `settings` must pin an
+    generalizes the same idea to every spot at once. `bump` is "volatility"
+    or "rate", the input moved by +/-BUMP_SIZE. `settings` must pin an
     explicit domain -- an auto-sized mesh moves under a vol bump, and the
     two surfaces would stop lining up node for node, making the subtraction
-    meaningless. A fresh CalculationEngine per bump direction: it only ever
-    learns its market from the provider it was built with, so repricing
-    under a bumped market means a new engine, not a mutation of this one.
+    meaningless.
     """
+    h = BUMP_SIZE
     solutions = []
-    for direction in (BumpDirection.ABOVE, BumpDirection.BELOW):
-        bumped_market = market.bump([bump_for(h, direction)])
-
-        engines = PricingEngineRegistry()
-        engines.register(
-            EQUITY_STRATEGY_PRODUCT_TYPE, BlackScholesPDEEngine, default=True, settings=settings
-        )
-        bumped_engine = CalculationEngine(VALUATION_DATE, engines=engines, mdp=_mdp_for(bumped_market))
-        bumped_engine.add([Valuation(trade=trade, metrics=[Metric.PV])])
-        bumped = bumped_engine.run()[TRADE_ID]
+    for sign in (1, -1):
+        bumped_sigma = sigma + sign * h if bump == "volatility" else sigma
+        bumped_r = r + sign * h if bump == "rate" else r
+        bumped = _price(instrument, [MetricSpec(Metric.PV, engine=PDE_ENGINE)], settings, spot, bumped_sigma, bumped_r)
 
         if not bumped.priced:
             raise ValueError(bumped.error_msg)
@@ -155,65 +124,29 @@ def _sensitivity_surface(settings, trade, market, bump_for, h):
 
 def price_portfolio(positions, spot, r, sigma, T, m=200, N=100, method="backward-difference", align_grid_to_strikes=True):
     try:
-        rate_curve = RateCurve(
-            curve_id=CURVE_ID,
-            points={tenor: r for tenor in (Tenor.M1, Tenor.M3, Tenor.Y1, Tenor.Y5, Tenor.Y10, Tenor.Y30)},
-            as_of=VALUATION_DATE,
-            compounding=CompoundingFrequency.CONTINUOUS,
-            rate_kind=RateKind.ZERO,
-            extrapolation=Extrapolation.FLAT,
-        )
-        market = MarketData(
-            quotes={UNDERLYING_SYMBOL: StockQuote(spot=spot, currency=CURRENCY)},
-            volatility_quotes={UNDERLYING_SYMBOL: VolatilityQuote(sigma)},
-            rate_curves={CURVE_ID: rate_curve},
-        )
+        expiry_date = VALUATION_DATE + timedelta(days=round(T * 365))
+        stock = Stock(UNDERLYING_SYMBOL, currency=CURRENCY)
+        legs = [
+            Position(EuropeanOption(stock, p["strike"], expiry_date, p["type"]), p["quantity"])
+            for p in positions
+        ]
+        strategy = CompositeInstrument(positions=legs)
 
-        expiry_date = (VALUATION_DATE + timedelta(days=round(T * 365))).isoformat()
-        trade = Trade(
-            trade_id=TRADE_ID,
-            product_type=EQUITY_STRATEGY_PRODUCT_TYPE,
-            quantity=1,
-            terms={
-                "legs": [
-                    {
-                        "product_type": EQUITY_OPTION_PRODUCT_TYPE,
-                        "quantity": p["quantity"],
-                        "terms": {
-                            "underlying": UNDERLYING_SYMBOL,
-                            "currency": CURRENCY,
-                            "strike": p["strike"],
-                            "expiry_date": expiry_date,
-                            "option_type": p["type"],
-                        },
-                    }
-                    for p in positions
-                ]
-            },
+        settings = PDESolverSettings(
+            m=int(m), N=int(N), method=method, align_grid_to_strikes=bool(align_grid_to_strikes)
         )
-
-        engines = PricingEngineRegistry()
-        engines.register(
-            EQUITY_STRATEGY_PRODUCT_TYPE,
-            BlackScholesPDEEngine,
-            default=True,
-            settings=PDESolverSettings(
-                m=int(m), N=int(N), method=method, align_grid_to_strikes=bool(align_grid_to_strikes)
-            ),
-        )
-        engine = CalculationEngine(VALUATION_DATE, engines=engines, mdp=_mdp_for(market))
-        engine.add([Valuation(trade=trade, metrics=METRICS)])
-        priced = engine.run()[TRADE_ID]
+        priced = _price(strategy, METRICS, settings, spot, sigma, r)
 
         # fiqua isolates per-metric failures: a result can come back priced
-        # with some requested metrics missing, each explained in
-        # metadata["failed_metrics"]. Those are reported per metric rather
-        # than failing the page -- vega and rho are the ones that drop out
-        # first, on a grid too coarse to bump and reprice against. PV is the
-        # exception: without it there is no surface and no payoff to draw.
-        failed = priced.metadata.get("failed_metrics", {})
-        if not priced.priced or Metric.PV not in priced.values:
-            return {"success": False, "error": priced.error_msg or failed[Metric.PV.value]}
+        # with some requested metrics missing, each listed in
+        # priced.failures. Those are reported per metric rather than failing
+        # the page -- vega and rho are the ones that drop out first, on a
+        # grid too coarse to bump and reprice against. PV is the exception:
+        # without it there is no surface and no payoff to draw.
+        priced_metrics = {value.metric for value in priced.values}
+        if not priced.priced or Metric.PV not in priced_metrics:
+            failures = {failure.metric: failure.error_msg for failure in priced.failures}
+            return {"success": False, "error": priced.error_msg or failures[Metric.PV]}
 
         # The solved surface every curve below is read off, dug out of the
         # result's own metadata -- raises if this result carries no grid
@@ -234,9 +167,9 @@ def price_portfolio(positions, spot, r, sigma, T, m=200, N=100, method="backward
             method=method,
         )
         surfaces = {
-            metric: _sensitivity_surface(pinned_settings, trade, market, bump_for, h)
-            for metric, bump_for, h in BUMPED_METRICS
-            if metric in priced.values
+            metric: _sensitivity_surface(pinned_settings, strategy, spot, sigma, r, bump)
+            for metric, bump in ((Metric.VEGA, "volatility"), (Metric.RHO, "rate"))
+            if metric in priced_metrics
         }
     except (ValueError, TypeError) as e:
         return {"success": False, "error": str(e)}
@@ -248,15 +181,10 @@ def price_portfolio(positions, spot, r, sigma, T, m=200, N=100, method="backward
     # into the grid explicitly (union1d sorts + dedupes) so each kink lands
     # exactly on an evaluated point, never rounded off to whichever linspace
     # point happens to land nearby.
-    #
-    # The legs come back as per-leg attribution on the priced result, so the
-    # payoff is summed over the same instruments fiqua resolved and priced,
-    # not a second reading of the raw position dicts.
-    legs = priced.metadata[Metric.PV.value]["positions"]
     strikes = [p["strike"] for p in positions]
     fine_grid_S = np.union1d(np.linspace(0.0, S_max, 400), strikes)
     payoff_curve = [
-        sum(pos.quantity * pos.instrument.payoff(float(s)) for pos, _ in legs)
+        sum(leg.quantity * leg.instrument.payoff(float(s)) for leg in legs)
         for s in fine_grid_S
     ]
 
@@ -278,10 +206,10 @@ def price_portfolio(positions, spot, r, sigma, T, m=200, N=100, method="backward
     # vega and rho are the two it has no curve for, and come from the
     # bumped surfaces above.
     curve_sources = {
-        Metric.PV: lambda t, k: grid.pv(t)(grid_S),
-        Metric.DELTA: lambda t, k: grid.delta(t)(grid_S),
-        Metric.GAMMA: lambda t, k: grid.gamma(t)(grid_S),
-        Metric.THETA: lambda t, k: grid.theta(t)(grid_S),
+        Metric.PV: lambda t, k: grid.get_pv(t)(grid_S),
+        Metric.DELTA: lambda t, k: grid.get_delta(t)(grid_S),
+        Metric.GAMMA: lambda t, k: grid.get_gamma(t)(grid_S),
+        Metric.THETA: lambda t, k: grid.get_theta(t)(grid_S),
         Metric.VEGA: lambda t, k: surfaces[Metric.VEGA][:, k],
         Metric.RHO: lambda t, k: surfaces[Metric.RHO][:, k],
     }
@@ -291,17 +219,17 @@ def price_portfolio(positions, spot, r, sigma, T, m=200, N=100, method="backward
             for k in idx
         ]
         for metric, curve in curve_sources.items()
-        if metric in priced.values
+        if metric in priced_metrics
     }
 
     # Spot Greeks come straight from fiqua's own metrics: fiqua spline-
     # interpolates PV and derives delta/gamma/theta at the exact spot, more
-    # accurate than this file re-deriving them from the grid. in_units()
-    # converts without touching the values the engine computed, so nothing
-    # scaled ever gets fed back into a request.
+    # accurate than this file re-deriving them from the grid.
+    # convert_to_units() changes only how a value is read, so nothing scaled
+    # ever gets fed back into a request.
     spot_metrics = {
-        metric.value: metric_value.value
-        for metric, metric_value in priced.in_units(DISPLAY_UNITS).items()
+        value.metric.value: value.get_number()
+        for value in priced.convert_to_units(DISPLAY_UNITS).values
     }
 
     return {
