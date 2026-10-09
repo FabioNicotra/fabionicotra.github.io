@@ -791,6 +791,21 @@ section h2 {
 .data-table td.is-edited input,
 .data-table td.is-edited select { border-bottom-color: var(--warning); }
 
+/* Maturity: the text field with a calendar button beside it. The native date
+   input only exists to open the picker, anchored under the button. */
+.date-field { position: relative; display: flex; align-items: center; gap: 0.15rem; }
+.date-field input[type="text"] { min-width: 0; flex: 1; }
+.date-field .date-pick { flex-shrink: 0; color: var(--muted); }
+.date-field .date-native {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* A row whose coupon or maturity differs from its snapshot is a different
    bond: its CUSIP is struck through and tagged, and its tenor dimmed. */
 .data-table td.is-modified-tenor { color: var(--muted); opacity: 0.6; }
