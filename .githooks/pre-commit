@@ -1,12 +1,12 @@
 #!/bin/sh
-# Blocks direct commits to main. Create a branch first: feature/... or fix/...
+# Blocks direct commits to main and develop. Create a branch first: feature/... or fix/...
 # Also blocks a commit whose python/ docstrings carry design-rationale
 # language instead of stating the contract -- see scripts/check_docstrings.py.
 
 branch=$(git symbolic-ref --short HEAD 2>/dev/null)
 
-if [ "$branch" = "main" ] && [ ! -f "$(git rev-parse --git-dir)/MERGE_HEAD" ]; then
-  echo "✗ Direct commits to main are not allowed." >&2
+if { [ "$branch" = "main" ] || [ "$branch" = "develop" ]; } && [ ! -f "$(git rev-parse --git-dir)/MERGE_HEAD" ]; then
+  echo "✗ Direct commits to $branch are not allowed." >&2
   echo "  Create a branch first, e.g.: git checkout -b feature/short-description" >&2
   exit 1
 fi
