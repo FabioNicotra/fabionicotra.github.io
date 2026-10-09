@@ -293,6 +293,8 @@ section h2 {
 .content { padding: 1rem 0 5rem; }
 .prose { max-width: 640px; margin-bottom: 3.5rem; }
 .prose:last-child { margin-bottom: 0; }
+/* Sibling margins collapse, so consecutive prose blocks keep a single gap. */
+.content > * + .prose { margin-top: 3.5rem; }
 .prose p { color: var(--muted); line-height: 1.65; margin: 0 0 1rem; }
 .prose p:last-child { margin-bottom: 0; }
 .prose em { color: var(--fg); font-style: italic; }
@@ -729,7 +731,7 @@ section h2 {
 
 /* Curve bootstrapping: chart on top, then the securities table at the full
    width of the page, since every security is one row of nine columns. */
-.curve-grid { grid-template-columns: 1fr; margin-bottom: 3.5rem; }
+.curve-grid { grid-template-columns: 1fr; }
 
 /* Valuation date, price side and reset share one row above the table they
    act on; on a phone they wrap onto as many lines as they need. */
@@ -788,6 +790,18 @@ section h2 {
 .data-table td.is-edited { background: color-mix(in srgb, var(--warning) 12%, transparent); }
 .data-table td.is-edited input,
 .data-table td.is-edited select { border-bottom-color: var(--warning); }
+
+/* A row whose coupon or maturity differs from its snapshot is a different
+   bond: its CUSIP is struck through and tagged, and its tenor dimmed. */
+.data-table td.is-modified-tenor { color: var(--muted); opacity: 0.6; }
+.data-table .cell-id.is-modified s { text-decoration-thickness: 1.5px; color: var(--muted); }
+.data-table .modified-tag {
+  display: block;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--warning);
+}
 
 /* A security left out of the curve, with the reason in its result cell. */
 .data-table tr.is-excluded td { color: var(--muted); }
