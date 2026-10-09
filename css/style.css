@@ -116,6 +116,10 @@ a:focus-visible, button:focus-visible, .btn:focus-visible {
 }
 
 main { position: relative; z-index: 1; max-width: 1000px; margin: 0 auto; padding: 0 2rem; }
+/* Pages with a tool layout or the homepage card grid use more of a wide
+   screen; prose-only pages keep 1000px, since their text stays at 640px. */
+@media (min-width: 1280px) { main:has(.tool-grid, .work) { max-width: 1200px; } }
+@media (min-width: 1600px) { main:has(.tool-grid, .work) { max-width: 1360px; } }
 
 .hero {
   min-height: 100vh;
@@ -206,6 +210,11 @@ section h2 {
   letter-spacing: 0.08em;
   color: var(--accent-2);
   margin-bottom: 0.9rem;
+}
+/* Six homepage cards: two even rows of three on a wide screen, where
+   auto-fit would otherwise make an uneven four and two. */
+@media (min-width: 1280px) {
+  .work .work-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 .work-grid h3 { margin: 0 0 0.75rem; font-size: 1.25rem; }
 .work-grid p { font-size: 0.92rem; }
