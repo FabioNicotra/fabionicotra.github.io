@@ -118,7 +118,6 @@ def _to_row(entry, terms, kind):
         "maturity": terms.maturity_date.isoformat(),
         "bid": None if quote is None else quote.bid,
         "ask": None if quote is None else quote.ask,
-        "last": None if quote is None else quote.last_price,
     }
 
 
@@ -226,9 +225,8 @@ def _build_entry(row, as_of):
             maturity_date=maturity,
             coupon_rate=None if is_bill else coupon_rate,
         )
-    prices = {field: row[key] for field, key in (("bid", "bid"), ("ask", "ask"), ("last_price", "last"))}
-    has_price = any(value is not None for value in prices.values())
-    quote = BondQuote(currency=CURRENCY, as_of=as_of, **prices) if has_price else None
+    has_price = row["bid"] is not None or row["ask"] is not None
+    quote = BondQuote(currency=CURRENCY, as_of=as_of, bid=row["bid"], ask=row["ask"]) if has_price else None
     entry = BondListEntry(
         cusip=row["id"],
         security_type=security_type,
