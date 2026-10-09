@@ -462,7 +462,15 @@
                     <td class="cell-id">${label}</td>
                     <td data-cell="type">${typeCell}</td>
                     <td data-cell="coupon">${couponCell}</td>
-                    <td data-cell="maturity"><input type="text" data-field="maturity" value="${isoToDisplay(row.maturity)}" placeholder="dd/mm/yyyy" maxlength="10" inputmode="numeric" autocomplete="off" aria-label="Maturity date, dd/mm/yyyy"></td>
+                    <td data-cell="maturity">
+                        <div class="date-field">
+                            <input type="text" data-field="maturity" value="${isoToDisplay(row.maturity)}" placeholder="dd/mm/yyyy" maxlength="10" inputmode="numeric" autocomplete="off" aria-label="Maturity date, dd/mm/yyyy">
+                            <button class="row-action date-pick" type="button" aria-label="Pick the maturity date from a calendar" title="Pick from calendar">
+                                <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3"/></svg>
+                            </button>
+                            <input type="date" class="date-native" tabindex="-1" aria-hidden="true">
+                        </div>
+                    </td>
                     ${PRICE_FIELDS.map(priceCell).join("")}
                     <td class="cell-zero">—</td>
                     <td>
@@ -507,6 +515,23 @@
                         }
                         runBootstrap();
                     });
+                });
+                // The native picker supplies the calendar and its year
+                // controls; the text field stays the display and the input of
+                // record, so a picked date goes through the same checks.
+                const nativeDate = tr.querySelector(".date-native");
+                const maturityInput = tr.querySelector('[data-field="maturity"]');
+                tr.querySelector(".date-pick").addEventListener("click", () => {
+                    const [y, m, d] = valuationDate.split("-").map(Number);
+                    nativeDate.min = new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+                    nativeDate.max = `${MAX_MATURITY_YEAR - 1}-12-31`;
+                    nativeDate.value = row.maturity ?? "";
+                    nativeDate.showPicker();
+                });
+                nativeDate.addEventListener("change", () => {
+                    if (!nativeDate.value) return;
+                    maturityInput.value = isoToDisplay(nativeDate.value);
+                    maturityInput.dispatchEvent(new Event("change"));
                 });
                 tr.querySelector(".row-action--reset").addEventListener("click", () => resetRow(row.id));
                 tr.querySelector(".row-action--remove").addEventListener("click", () => removeRow(row.id));
