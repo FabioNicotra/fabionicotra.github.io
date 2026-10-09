@@ -166,6 +166,24 @@
             // just the nodes: from this fraction of the shortest maturity to
             // this multiple of the longest.
             const LOG_AXIS_SPAN = [0.8, 1.05];
+            const LINEAR_AXIS_PAD = 1.03;
+            // The log axis is labelled at the standard Treasury tenors; a
+            // phone drops the ones that crowd their neighbours, so the rest
+            // fit side by side unrotated.
+            const STANDARD_TENORS = [
+                ["1M", 1 / 12],
+                ["3M", 0.25],
+                ["6M", 0.5],
+                ["1Y", 1],
+                ["2Y", 2],
+                ["3Y", 3],
+                ["5Y", 5],
+                ["7Y", 7],
+                ["10Y", 10],
+                ["20Y", 20],
+                ["30Y", 30],
+            ];
+            const COMPACT_DROPPED_TENORS = ["3Y", "7Y", "20Y"];
             const TRANSITION = { duration: 250, easing: "cubic-in-out" };
             let lastChartShape = null;
 
@@ -265,7 +283,7 @@
                             .querySelectorAll("#scaleToggle .view-toggle-btn")
                             .forEach((b) => b.classList.toggle("is-active", b === btn));
                         axisScale = btn.dataset.scale;
-                        if (lastResult) renderChart(lastResult);
+                        if (lastResult) renderChart(lastResult, { animate: true });
                     });
                 });
                 document.getElementById("resetAll").addEventListener("click", () => loadDay(valuationDate));
@@ -421,13 +439,18 @@
                 tr.querySelectorAll("[data-field]").forEach((input) => {
                     input.addEventListener("change", () => {
                         const field = input.dataset.field;
+                        let value;
                         if (field === "type" || field === "maturity") {
-                            row[field] = input.value || null;
+                            value = input.value || null;
                         } else {
-                            const value = parseFloat(input.value);
-                            row[field] = Number.isNaN(value) ? null : value;
-                            if (PRICE_FIELDS.includes(field)) input.value = formatPrice(row[field]);
+                            value = parseFloat(input.value);
+                            if (Number.isNaN(value)) value = null;
+                            if (PRICE_FIELDS.includes(field)) input.value = formatPrice(value);
                         }
+                        // Leaving a field fires another change even when its
+                        // value didn't move since the last one.
+                        if (value === row[field]) return;
+                        row[field] = value;
                         // A bill has no coupon cell and a note needs one, so
                         // changing a custom row's type rebuilds the row.
                         if (field === "type") {
@@ -576,10 +599,61 @@
             // points: a new solve on the same nodes animates, anything that
             // adds, drops or moves a node redraws at once.
             function getChartShape(traces) {
-                return [axisScale, ...traces.map((trace) => `${trace.uid}:${trace.x.length}`)].join("|");
+                return traces.map((trace) => `${trace.uid}:${trace.x.length}`).join("|");
             }
 
-            function renderChart(result, { animate = false } = {}) {
+            // The x-axis itself is always linear: on the log scale the page
+            // plots log10 of each maturity and labels the ticks with tenors.
+            // A switch of scale then only moves the points, which Plotly can
+            // ease, where a change of axis type would redraw at once.
+            function getXAxis(nodeTimes, compact) {
+                const last = nodeTimes[nodeTimes.length - 1];
+                if (axisScale === "linear") {
+                    return {
+                        toX: (t) => t,
+                        axis: { title: "Maturity (years)", tickmode: "auto", range: [0, last * LINEAR_AXIS_PAD] },
+                    };
+                }
+                const tenors = STANDARD_TENORS.filter(([label]) => !(compact && COMPACT_DROPPED_TENORS.includes(label)));
+                return {
+                    toX: Math.log10,
+                    axis: {
+                        title: "Maturity (log scale)",
+                        tickmode: "array",
+                        tickangle: 0,
+                        tickvals: tenors.map(([, years]) => Math.log10(years)),
+                        ticktext: tenors.map(([label]) => label),
+                        range: [Math.log10(nodeTimes[0] * LOG_AXIS_SPAN[0]), Math.log10(last * LOG_AXIS_SPAN[1])],
+                    },
+                };
+            }
+
+            // One chart update at a time: a redraw that lands mid-transition
+            // cuts it short and leaves Plotly holding the old axis range, so
+            // each one waits for the last to finish, and only the latest of
+            // those waiting is drawn.
+            let chartBusy = false;
+            let pendingChart = null;
+
+            function renderChart(result, options = {}) {
+                pendingChart = [result, options];
+                if (!chartBusy) drainChart();
+            }
+
+            async function drainChart() {
+                chartBusy = true;
+                try {
+                    while (pendingChart) {
+                        const [result, options] = pendingChart;
+                        pendingChart = null;
+                        await drawChart(result, options);
+                    }
+                } finally {
+                    chartBusy = false;
+                }
+            }
+
+            async function drawChart(result, { animate = false } = {}) {
                 if (!result.success) return;
                 const theme = getChartTheme();
                 const compact = window.matchMedia(COMPACT_CHART).matches;
@@ -587,53 +661,62 @@
                     rows.map((row) => [row.id, row.kind === "custom" ? `Custom ${row.id.split("-")[1]}` : row.id]),
                 );
                 const tenorById = Object.fromEntries(rows.map((row) => [row.id, row.tenor]));
+                const xAxis = getXAxis(
+                    result.nodes.map((node) => node.t),
+                    compact,
+                );
+                const toX = (times) => times.map(xAxis.toX);
 
                 const traces = [
                     {
-                        x: result.grid,
+                        x: toX(result.grid),
                         y: result.zero,
+                        customdata: result.grid,
                         mode: "lines",
                         name: "Zero rate",
                         uid: "zero",
                         line: { color: theme.zero, width: 2.5 },
-                        hovertemplate: "t = %{x:.2f} yr<br>zero = %{y:.3f}%<extra></extra>",
+                        hovertemplate: "t = %{customdata:.2f} yr<br>zero = %{y:.3f}%<extra></extra>",
                     },
                     {
-                        x: result.grid,
+                        x: toX(result.grid),
                         y: result.forward,
+                        customdata: result.grid,
                         mode: "lines",
                         name: "Instantaneous forward",
                         uid: "forward",
                         line: { color: theme.forward, width: 1.75 },
-                        hovertemplate: "t = %{x:.2f} yr<br>forward = %{y:.3f}%<extra></extra>",
+                        hovertemplate: "t = %{customdata:.2f} yr<br>forward = %{y:.3f}%<extra></extra>",
                     },
                     {
-                        x: result.nodes.map((node) => node.t),
+                        x: toX(result.nodes.map((node) => node.t)),
                         y: result.nodes.map((node) => node.zero),
                         customdata: result.nodes.map((node) => [
                             tenorById[node.id] ? `${tenorById[node.id]} · ${labels[node.id]}` : labels[node.id] ?? node.id,
+                            node.t,
                         ]),
                         mode: "markers",
                         name: "Curve nodes",
                         uid: "nodes",
                         marker: { color: theme.zero, size: 8, line: { color: theme.surface, width: 2 } },
-                        hovertemplate: "%{customdata[0]}<br>t = %{x:.2f} yr<br>zero = %{y:.3f}%<extra></extra>",
+                        hovertemplate: "%{customdata[0]}<br>t = %{customdata[1]:.2f} yr<br>zero = %{y:.3f}%<extra></extra>",
                     },
                 ];
                 if (result.par) {
                     traces.push(
                         {
-                            x: result.par.grid,
+                            x: toX(result.par.grid),
                             y: result.par.values,
+                            customdata: result.par.grid,
                             mode: "lines",
                             name: "Par yield",
                             uid: "par",
                             legendgroup: "par",
                             line: { color: theme.par, width: 2 },
-                            hovertemplate: "t = %{x:.2f} yr<br>par = %{y:.3f}%<extra></extra>",
+                            hovertemplate: "t = %{customdata:.2f} yr<br>par = %{y:.3f}%<extra></extra>",
                         },
                         {
-                            x: result.par.points.map((p) => p.t),
+                            x: toX(result.par.points.map((p) => p.t)),
                             y: result.par.points.map((p) => p.value),
                             customdata: result.par.points.map((p) => [p.tenor]),
                             mode: "markers",
@@ -647,17 +730,6 @@
                     );
                 }
 
-                const nodeTimes = result.nodes.map((node) => node.t);
-                const xRange =
-                    axisScale === "log"
-                        ? {
-                              autorange: false,
-                              range: [
-                                  Math.log10(nodeTimes[0] * LOG_AXIS_SPAN[0]),
-                                  Math.log10(nodeTimes[nodeTimes.length - 1] * LOG_AXIS_SPAN[1]),
-                              ],
-                          }
-                        : { autorange: true };
                 const shape = getChartShape(traces);
                 const transition = animate && shape === lastChartShape ? TRANSITION : { duration: 0 };
                 lastChartShape = shape;
@@ -680,10 +752,9 @@
                               xanchor: "left",
                           },
                     xaxis: {
-                        title: "Maturity (years)",
-                        type: axisScale,
+                        ...xAxis.axis,
+                        autorange: false,
                         uirevision: axisScale,
-                        ...xRange,
                         gridcolor: theme.grid,
                         color: theme.font,
                         zerolinecolor: theme.grid,
@@ -707,10 +778,13 @@
                     },
                     margin: compact ? { l: 44, r: 14, t: 14, b: 110 } : { l: 60, r: 30, t: 50, b: 100 },
                 };
-                Plotly.react("plot", traces, layout, {
+                await Plotly.react("plot", traces, layout, {
                     responsive: true,
                     displayModeBar: !compact,
                 });
+                if (transition.duration) {
+                    await new Promise((resolve) => setTimeout(resolve, transition.duration));
+                }
             }
 
             initializePyodide().catch((err) => {
