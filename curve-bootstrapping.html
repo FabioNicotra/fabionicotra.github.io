@@ -385,6 +385,41 @@
                 runBootstrap();
             }
 
+            // Maturities are held as ISO dates and shown as dd/mm/yyyy.
+            const MAX_MATURITY_YEAR = 2100;
+
+            function isoToDisplay(iso) {
+                if (!iso) return "";
+                const [y, m, d] = iso.split("-");
+                return `${d}/${m}/${y}`;
+            }
+
+            // The ISO date for a dd/mm/yyyy string, or null when it isn't a
+            // real calendar date.
+            function displayToIso(text) {
+                const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(text.trim());
+                if (!match) return null;
+                const [, d, m, y] = match.map(Number);
+                const date = new Date(Date.UTC(y, m - 1, d));
+                if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) return null;
+                return `${match[3]}-${match[2]}-${match[1]}`;
+            }
+
+            // Why a typed maturity is refused, or null when it is acceptable.
+            function maturityError(text) {
+                const iso = displayToIso(text);
+                if (!iso) return "Enter the maturity as dd/mm/yyyy.";
+                if (iso <= valuationDate) return `Maturity must be after the valuation date (${isoToDisplay(valuationDate)}).`;
+                if (Number(iso.slice(0, 4)) >= MAX_MATURITY_YEAR) return `Maturity must be before ${MAX_MATURITY_YEAR}.`;
+                return null;
+            }
+
+            // A snapshot row whose coupon or maturity moved describes a
+            // different bond; a price edit leaves it the traded security.
+            function isModified(row) {
+                return row.kind !== "custom" && (isEdited(row, "coupon") || isEdited(row, "maturity"));
+            }
+
             function formatValue(value) {
                 return value === null || value === undefined ? "" : String(value);
             }
@@ -423,11 +458,11 @@
                 const priceCell = (field) =>
                     `<td data-cell="${field}"><input type="number" data-field="${field}" value="${formatPrice(row[field])}" min="0" step="0.005" inputmode="decimal" aria-label="${field[0].toUpperCase() + field.slice(1)} price"></td>`;
                 tr.innerHTML = `
-                    <td>${row.tenor ?? "—"}</td>
+                    <td class="cell-tenor">${row.tenor ?? "—"}</td>
                     <td class="cell-id">${label}</td>
                     <td data-cell="type">${typeCell}</td>
                     <td data-cell="coupon">${couponCell}</td>
-                    <td data-cell="maturity"><input type="date" data-field="maturity" value="${formatValue(row.maturity)}" aria-label="Maturity date"></td>
+                    <td data-cell="maturity"><input type="text" data-field="maturity" value="${isoToDisplay(row.maturity)}" placeholder="dd/mm/yyyy" maxlength="10" inputmode="numeric" autocomplete="off" aria-label="Maturity date, dd/mm/yyyy"></td>
                     ${PRICE_FIELDS.map(priceCell).join("")}
                     <td class="cell-zero">—</td>
                     <td>
@@ -440,8 +475,20 @@
                     input.addEventListener("change", () => {
                         const field = input.dataset.field;
                         let value;
-                        if (field === "type" || field === "maturity") {
+                        if (field === "type") {
                             value = input.value || null;
+                        } else if (field === "maturity") {
+                            const text = input.value.trim();
+                            if (text) {
+                                const error = maturityError(text);
+                                if (error) {
+                                    input.value = isoToDisplay(row.maturity);
+                                    showStatus(error, true);
+                                    return;
+                                }
+                            }
+                            value = text ? displayToIso(text) : null;
+                            input.value = isoToDisplay(value);
                         } else {
                             value = parseFloat(input.value);
                             if (Number.isNaN(value)) value = null;
@@ -483,10 +530,24 @@
                     if (!cell) return;
                     cell.classList.toggle("is-edited", edited);
                     const original = row.original[field];
-                    const shown = PRICE_FIELDS.includes(field) ? formatPrice(original) : original;
+                    const shown = PRICE_FIELDS.includes(field)
+                        ? formatPrice(original)
+                        : field === "maturity"
+                          ? isoToDisplay(original)
+                          : original;
                     cell.title = edited ? `Snapshot: ${original === null ? "empty" : shown}` : "";
                 });
                 tr.querySelector(".row-action--reset").classList.toggle("is-idle", !anyEdited);
+                markModified(tr, row);
+            }
+
+            function markModified(tr, row) {
+                const modified = isModified(row);
+                const idCell = tr.querySelector(".cell-id");
+                tr.querySelector(".cell-tenor").classList.toggle("is-modified-tenor", modified);
+                idCell.classList.toggle("is-modified", modified);
+                idCell.title = modified ? "Its coupon or maturity differs from the traded security." : "";
+                idCell.innerHTML = modified ? `<s>${row.id}</s><span class="modified-tag">modified</span>` : row.id;
             }
 
             function renderTable() {
@@ -661,6 +722,7 @@
                     rows.map((row) => [row.id, row.kind === "custom" ? `Custom ${row.id.split("-")[1]}` : row.id]),
                 );
                 const tenorById = Object.fromEntries(rows.map((row) => [row.id, row.tenor]));
+                const modifiedById = Object.fromEntries(rows.map((row) => [row.id, isModified(row)]));
                 const xAxis = getXAxis(
                     result.nodes.map((node) => node.t),
                     compact,
@@ -692,7 +754,8 @@
                         x: toX(result.nodes.map((node) => node.t)),
                         y: result.nodes.map((node) => node.zero),
                         customdata: result.nodes.map((node) => [
-                            tenorById[node.id] ? `${tenorById[node.id]} · ${labels[node.id]}` : labels[node.id] ?? node.id,
+                            (tenorById[node.id] ? `${tenorById[node.id]} · ${labels[node.id]}` : labels[node.id] ?? node.id) +
+                                (modifiedById[node.id] ? " (modified)" : ""),
                             node.t,
                         ]),
                         mode: "markers",
