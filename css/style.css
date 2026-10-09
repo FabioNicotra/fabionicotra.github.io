@@ -728,7 +728,7 @@ section h2 {
 .chart-card--tall #plot { height: 560px; }
 
 /* Curve bootstrapping: chart on top, then the securities table at the full
-   width of the page, since every security is one row of ten columns. */
+   width of the page, since every security is one row of nine columns. */
 .curve-grid { grid-template-columns: 1fr; margin-bottom: 3.5rem; }
 
 /* Valuation date, price side and reset share one row above the table they
@@ -765,20 +765,19 @@ section h2 {
   .toolbar-field select { min-height: 44px; }
 }
 
-/* Securities: wide enough for ten columns, scrolled inside .table-scroll on
+/* Securities: wide enough for nine columns, scrolled inside .table-scroll on
    a phone instead of squeezed. Numbers are right-aligned so their decimals
    line up down a column. */
-.data-table--securities { table-layout: fixed; min-width: 860px; font-size: 0.88rem; }
-.data-table--securities th:nth-child(1), .data-table--securities td:nth-child(1) { width: 6.5%; }
-.data-table--securities th:nth-child(2), .data-table--securities td:nth-child(2) { width: 11%; }
-.data-table--securities th:nth-child(3), .data-table--securities td:nth-child(3) { width: 7%; }
-.data-table--securities th:nth-child(4), .data-table--securities td:nth-child(4) { width: 8%; }
-.data-table--securities th:nth-child(5), .data-table--securities td:nth-child(5) { width: 13.5%; }
+.data-table--securities { table-layout: fixed; min-width: 760px; font-size: 0.88rem; }
+.data-table--securities th:nth-child(1), .data-table--securities td:nth-child(1) { width: 7%; }
+.data-table--securities th:nth-child(2), .data-table--securities td:nth-child(2) { width: 12%; }
+.data-table--securities th:nth-child(3), .data-table--securities td:nth-child(3) { width: 8%; }
+.data-table--securities th:nth-child(4), .data-table--securities td:nth-child(4) { width: 9%; }
+.data-table--securities th:nth-child(5), .data-table--securities td:nth-child(5) { width: 15%; }
 .data-table--securities th:nth-child(6), .data-table--securities td:nth-child(6),
-.data-table--securities th:nth-child(7), .data-table--securities td:nth-child(7),
-.data-table--securities th:nth-child(8), .data-table--securities td:nth-child(8) { width: 12.5%; }
-.data-table--securities th:nth-child(9), .data-table--securities td:nth-child(9) { width: 9%; }
-.data-table--securities th:last-child, .data-table--securities td:last-child { width: 7.5%; white-space: nowrap; }
+.data-table--securities th:nth-child(7), .data-table--securities td:nth-child(7) { width: 15%; }
+.data-table--securities th:nth-child(8), .data-table--securities td:nth-child(8) { width: 11%; }
+.data-table--securities th:last-child, .data-table--securities td:last-child { width: 8%; white-space: nowrap; }
 .data-table--securities td { padding: 0.35rem 0.3rem; }
 .data-table--securities input[type="number"] { text-align: right; font-variant-numeric: tabular-nums; }
 .data-table--securities .cell-id { font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
