@@ -47,7 +47,7 @@
                         <div id="plot"></div>
                     </div>
 
-                    <div class="glass-card">
+                    <div class="glass-card securities-card">
                         <h2>Securities</h2>
                         <div class="table-toolbar">
                             <label class="toolbar-field" for="inp-date">
@@ -106,6 +106,20 @@
                             <button type="button" class="btn btn-small" id="addCustom">Add custom row</button>
                         </div>
                         <div id="status" class="tool-status" style="display: none"></div>
+                    </div>
+
+                    <div class="glass-card par-card">
+                        <h2>Par yields</h2>
+                        <table class="data-table data-table--par">
+                            <thead>
+                                <tr>
+                                    <th>Tenor</th>
+                                    <th>Par %</th>
+                                </tr>
+                            </thead>
+                            <tbody id="parBody"></tbody>
+                        </table>
+                        <p class="par-note" id="parNote" hidden></p>
                     </div>
                 </div>
 
@@ -624,6 +638,20 @@
 
             function setChartVisible(visible) {
                 document.querySelector(".chart-card").style.display = visible ? "" : "none";
+                document.querySelector(".par-card").style.display = visible ? "" : "none";
+            }
+
+            // One row per standard tenor the curve reaches, or the reason
+            // there is no par yield curve in place of the rows.
+            function renderParTable(result) {
+                const body = document.getElementById("parBody");
+                const note = document.getElementById("parNote");
+                const points = result.par ? result.par.points : [];
+                body.innerHTML = points
+                    .map((point) => `<tr><td>${point.tenor}</td><td>${point.value.toFixed(3)}</td></tr>`)
+                    .join("");
+                note.textContent = result.par_error ?? "";
+                note.hidden = !result.par_error;
             }
 
             // One solve at a time: an edit made while a solve is running
@@ -675,9 +703,9 @@
                     setChartVisible(false);
                     return;
                 }
-                if (result.par_error) showStatus(`Par yields: ${result.par_error}`, true);
-                else hideStatus();
+                hideStatus();
                 setChartVisible(true);
+                renderParTable(result);
                 renderChart(result, { animate: true });
             }
 
