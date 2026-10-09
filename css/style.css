@@ -741,6 +741,20 @@ section h2 {
 /* Curve bootstrapping: chart on top, then the securities table at the full
    width of the page, since every security is one row of nine columns. */
 .curve-grid { grid-template-columns: 1fr; }
+/* From 1280px the par yields sit in a narrow column beside the chart, and
+   the securities table keeps the full width below both. */
+@media (min-width: 1280px) {
+  .curve-grid {
+    grid-template-columns: minmax(0, 1fr) 200px;
+    grid-template-areas: "chart par" "securities securities";
+  }
+  .curve-grid > .chart-card { grid-area: chart; }
+  .curve-grid > .par-card { grid-area: par; }
+  .curve-grid > .securities-card { grid-area: securities; }
+}
+.data-table--par th:last-child,
+.data-table--par td:last-child { width: auto; text-align: right; font-variant-numeric: tabular-nums; }
+.par-note { color: var(--muted); font-size: 0.85rem; line-height: 1.5; margin: 0.75rem 0 0; }
 
 /* Valuation date, price side and reset share one row above the table they
    act on; on a phone they wrap onto as many lines as they need. */
