@@ -65,21 +65,21 @@
                             <button type="button" class="btn btn-small" id="resetAll">Reset all</button>
                         </div>
                         <div class="table-scroll">
-                            <table class="data-table data-table--securities">
-                                <thead>
-                                    <tr>
-                                        <th>Tenor</th>
-                                        <th>CUSIP</th>
-                                        <th>Type</th>
-                                        <th>Coupon %</th>
-                                        <th>Maturity</th>
-                                        <th>Bid</th>
-                                        <th>Ask</th>
-                                        <th>Zero %</th>
-                                        <th></th>
+                            <table class="data-table data-table--securities" role="table" aria-label="Securities">
+                                <thead role="rowgroup">
+                                    <tr role="row">
+                                        <th role="columnheader">Tenor</th>
+                                        <th role="columnheader">CUSIP</th>
+                                        <th role="columnheader">Type</th>
+                                        <th role="columnheader">Coupon %</th>
+                                        <th role="columnheader">Maturity</th>
+                                        <th role="columnheader">Bid</th>
+                                        <th role="columnheader">Ask</th>
+                                        <th role="columnheader">Zero %</th>
+                                        <th role="columnheader"><span class="visually-hidden">Actions</span></th>
                                     </tr>
                                 </thead>
-                                <tbody id="tableBody"></tbody>
+                                <tbody id="tableBody" role="rowgroup"></tbody>
                             </table>
                         </div>
                         <div class="add-security">
@@ -455,6 +455,7 @@
             // result column is filled in separately once the curve is solved.
             function buildRow(row) {
                 const tr = document.createElement("tr");
+                tr.setAttribute("role", "row");
                 tr.dataset.id = row.id;
                 const isCustom = row.kind === "custom";
                 const isBill = row.type === "bill";
@@ -470,13 +471,13 @@
                     ? "—"
                     : `<input type="number" data-field="coupon" value="${formatValue(row.coupon)}" min="0" step="0.125" inputmode="decimal" aria-label="Coupon, percent">`;
                 const priceCell = (field) =>
-                    `<td data-cell="${field}"><input type="number" data-field="${field}" value="${formatPrice(row[field])}" min="0" step="0.005" inputmode="decimal" aria-label="${field[0].toUpperCase() + field.slice(1)} price"></td>`;
+                    `<td role="cell" data-cell="${field}" data-label="${field[0].toUpperCase() + field.slice(1)}"><input type="number" data-field="${field}" value="${formatPrice(row[field])}" min="0" step="0.005" inputmode="decimal" aria-label="${field[0].toUpperCase() + field.slice(1)} price"></td>`;
                 tr.innerHTML = `
-                    <td class="cell-tenor">${row.tenor ?? "—"}</td>
-                    <td class="cell-id">${label}</td>
-                    <td data-cell="type">${typeCell}</td>
-                    <td data-cell="coupon">${couponCell}</td>
-                    <td data-cell="maturity">
+                    <td role="cell" class="cell-tenor">${row.tenor ?? "—"}</td>
+                    <td role="cell" class="cell-id">${label}</td>
+                    <td role="cell" data-cell="type">${typeCell}</td>
+                    <td role="cell" data-cell="coupon" data-label="Coupon %">${couponCell}</td>
+                    <td role="cell" data-cell="maturity" data-label="Maturity">
                         <div class="date-field">
                             <input type="text" data-field="maturity" value="${isoToDisplay(row.maturity)}" placeholder="dd/mm/yyyy" maxlength="10" inputmode="numeric" autocomplete="off" aria-label="Maturity date, dd/mm/yyyy">
                             <button class="row-action date-pick" type="button" aria-label="Pick the maturity date from a calendar" title="Pick from calendar">
@@ -486,8 +487,8 @@
                         </div>
                     </td>
                     ${PRICE_FIELDS.map(priceCell).join("")}
-                    <td class="cell-zero">—</td>
-                    <td>
+                    <td role="cell" class="cell-zero" data-label="Zero %">—</td>
+                    <td role="cell" class="cell-actions">
                         <button class="row-action row-action--reset" type="button" aria-label="Reset ${label} to its snapshot values" title="Reset to snapshot">↺</button>
                         <button class="row-action row-action--remove" type="button" aria-label="Remove ${label}" title="Remove">−</button>
                     </td>
