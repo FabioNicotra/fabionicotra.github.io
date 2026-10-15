@@ -110,6 +110,15 @@
 
                     <div class="glass-card par-card">
                         <h2>Par yields</h2>
+                        <div class="table-toolbar">
+                            <div class="toolbar-field">
+                                Basis
+                                <div class="view-toggle" id="basisToggle" role="group" aria-label="Par yield basis">
+                                    <button type="button" class="view-toggle-btn is-active" data-basis="cmt">CMT</button>
+                                    <button type="button" class="view-toggle-btn" data-basis="otr">On-the-run</button>
+                                </div>
+                            </div>
+                        </div>
                         <table class="data-table data-table--par">
                             <thead>
                                 <tr>
@@ -140,10 +149,17 @@
                         nodes, so the instantaneous forward rate is flat between
                         two maturities and jumps at each node. Zero rates and
                         forwards are continuously compounded. Par yields are the
-                        semiannual coupons at which a bond issued on the
-                        valuation date and maturing at each standard tenor
-                        prices at par off the curve, the same basis as
-                        Treasury's published par yield curve.
+                        semiannual coupons at which a bond prices at par off the
+                        curve, on one of two bases. On the CMT basis the bond is
+                        issued on the valuation date and matures exactly at each
+                        standard tenor, the same basis as Treasury's published
+                        par yield curve. On the on-the-run basis it is the
+                        on-the-run security of each tenor itself, at its own
+                        coupon dates and maturity, which is what "the 10-year"
+                        means in a market quote. A tenor with no on-the-run
+                        security that day has no par yield on that basis, and
+                        neither does a row whose coupon or maturity was edited,
+                        since it is no longer the traded security.
                     </p>
                 </div>
             </section>
@@ -162,6 +178,7 @@
             let rows = [];
             let valuationDate = null;
             let side = "mid";
+            let basis = "cmt";
             let axisScale = "linear";
             let customCount = 0;
             let lastResult = null;
@@ -287,6 +304,16 @@
                             .querySelectorAll("#sideToggle .view-toggle-btn")
                             .forEach((b) => b.classList.toggle("is-active", b === btn));
                         side = btn.dataset.side;
+                        runBootstrap();
+                    });
+                });
+                document.querySelectorAll("#basisToggle .view-toggle-btn").forEach((btn) => {
+                    btn.addEventListener("click", () => {
+                        if (btn.classList.contains("is-active")) return;
+                        document
+                            .querySelectorAll("#basisToggle .view-toggle-btn")
+                            .forEach((b) => b.classList.toggle("is-active", b === btn));
+                        basis = btn.dataset.basis;
                         runBootstrap();
                     });
                 });
@@ -642,14 +669,29 @@
                 document.querySelector(".par-card").style.display = visible ? "" : "none";
             }
 
+            const TENOR_ORDER = STANDARD_TENORS.map(([label]) => label);
+
+            // Every standard tenor the curve reaches, in order: its par
+            // yield, or a null value for a tenor with no on-the-run security.
+            function getParRows(par) {
+                if (!par) return [];
+                const missing = par.missing.map((point) => ({ ...point, value: null }));
+                return [...par.points, ...missing].sort(
+                    (a, b) => TENOR_ORDER.indexOf(a.tenor) - TENOR_ORDER.indexOf(b.tenor),
+                );
+            }
+
             // One row per standard tenor the curve reaches, or the reason
             // there is no par yield curve in place of the rows.
             function renderParTable(result) {
                 const body = document.getElementById("parBody");
                 const note = document.getElementById("parNote");
-                const points = result.par ? result.par.points : [];
-                body.innerHTML = points
-                    .map((point) => `<tr><td>${point.tenor}</td><td>${point.value.toFixed(3)}</td></tr>`)
+                body.innerHTML = getParRows(result.par)
+                    .map((point) =>
+                        point.value === null
+                            ? `<tr title="No on-the-run security in the table"><td>${point.tenor}</td><td>—</td></tr>`
+                            : `<tr><td>${point.tenor}</td><td>${point.value.toFixed(3)}</td></tr>`,
+                    )
                     .join("");
                 note.textContent = result.par_error ?? "";
                 note.hidden = !result.par_error;
@@ -686,13 +728,16 @@
                     .map((row) => ({
                         id: row.id,
                         kind: row.kind,
+                        // A modified row is no longer the traded security,
+                        // so it stands for no tenor.
+                        tenor: isModified(row) ? null : row.tenor,
                         type: row.type,
                         coupon: row.coupon,
                         maturity: row.maturity,
                         bid: row.bid,
                         ask: row.ask,
                     }));
-                const result = await callPython("bootstrap", payload, valuationDate, side);
+                const result = await callPython("bootstrap", payload, valuationDate, side, basis);
                 if (result.success) {
                     result.nodeById = Object.fromEntries(result.nodes.map((node) => [node.id, node]));
                 }
@@ -820,22 +865,26 @@
                     },
                 ];
                 if (result.par) {
+                    // The markers cover every tenor the curve reaches, with
+                    // no y where a tenor has no on-the-run point, so a basis
+                    // switch keeps the trace's length and eases.
+                    const parRows = getParRows(result.par);
                     traces.push(
                         {
                             x: toX(result.par.grid),
                             y: result.par.values,
                             customdata: result.par.grid,
                             mode: "lines",
-                            name: "Par yield",
+                            name: basis === "otr" ? "Par yield (on-the-run)" : "Par yield (CMT)",
                             uid: "par",
                             legendgroup: "par",
                             line: { color: theme.par, width: 2 },
                             hovertemplate: "t = %{customdata:.2f} yr<br>par = %{y:.3f}%<extra></extra>",
                         },
                         {
-                            x: toX(result.par.points.map((p) => p.t)),
-                            y: result.par.points.map((p) => p.value),
-                            customdata: result.par.points.map((p) => [p.tenor]),
+                            x: toX(parRows.map((p) => p.t)),
+                            y: parRows.map((p) => p.value),
+                            customdata: parRows.map((p) => [p.tenor]),
                             mode: "markers",
                             name: "Par yield",
                             uid: "par-tenors",

@@ -745,12 +745,17 @@ section h2 {
    the securities table keeps the full width below both. */
 @media (min-width: 1280px) {
   .curve-grid {
-    grid-template-columns: minmax(0, 1fr) 200px;
+    grid-template-columns: minmax(0, 1fr) 240px;
     grid-template-areas: "chart par" "securities securities";
+    /* The par card ends level with the chart beside it. */
+    align-items: stretch;
   }
   .curve-grid > .chart-card { grid-area: chart; }
   .curve-grid > .par-card { grid-area: par; }
   .curve-grid > .securities-card { grid-area: securities; }
+  /* The narrow column fits the basis toggle only below its label. */
+  .par-card .toolbar-field { flex-direction: column; align-items: flex-start; }
+  .par-card .view-toggle-btn { white-space: nowrap; }
 }
 .data-table--par th:last-child,
 .data-table--par td:last-child { width: auto; text-align: right; font-variant-numeric: tabular-nums; }

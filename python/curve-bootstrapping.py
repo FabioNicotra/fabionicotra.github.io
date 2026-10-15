@@ -36,7 +36,7 @@ from fiqua.market import (
     ReferenceDataProvider,
     TreasurySecurityType,
 )
-from fiqua.rates import BootstrappedCurveRequest, ParYieldCurveRequest
+from fiqua.rates import BootstrappedCurveRequest, ParTenorBasis, ParYieldCurveRequest
 from fiqua.rates.schedule import RollConvention
 
 QUOTES_URL = "https://raw.githubusercontent.com/FabioNicotra/fiqua-market-snapshots/main/treasury_bond_quotes.json"
@@ -44,6 +44,7 @@ CURRENCY = "USD"
 UNIVERSE = "UST-OTR"
 CURVE_ID = CurveId(CURRENCY, UNIVERSE)
 SIDES = {"bid": PriceSide.BID, "ask": PriceSide.ASK, "mid": PriceSide.MID}
+BASES = {"cmt": ParTenorBasis.CONSTANT_MATURITY, "otr": ParTenorBasis.ON_THE_RUN}
 CURVE_TYPES = (TreasurySecurityType.BILL, TreasurySecurityType.NOTE, TreasurySecurityType.BOND)
 
 # A par yield is read at a standard tenor only when the curve reaches it, up
@@ -51,6 +52,7 @@ CURVE_TYPES = (TreasurySecurityType.BILL, TreasurySecurityType.NOTE, TreasurySec
 # little short of its nominal term once it has aged since its auction, such
 # as a 30-year bond a few months after it was issued.
 PAR_TENOR_SLACK = 0.05
+_TENORS_BY_LABEL = {tenor.label: tenor for tenor in Tenor}
 
 # Each snapshot is fetched once per page load: the reference snapshot is
 # undated, and the market snapshot is read through one provider per
@@ -233,6 +235,7 @@ def _build_entry(row, as_of):
         coupon_rate=coupon_rate,
         maturity_date=maturity,
         quote=quote,
+        tenor=_TENORS_BY_LABEL.get(row.get("tenor")),
     )
     return entry, terms
 
@@ -278,11 +281,23 @@ def _get_par_tenors(priced, as_of):
     return tuple(tenor for tenor in Tenor if int(tenor) / 12 <= longest * (1 + PAR_TENOR_SLACK))
 
 
-def bootstrap(rows, valuation_date, side):
+def _get_on_the_run_tenors(priced):
+    """The tenors the on-the-run securities among `priced` stand for, in
+    order."""
+    return tuple(sorted({entry.tenor for entry in priced if entry.tenor is not None}))
+
+
+def bootstrap(rows, valuation_date, side, basis):
     """The Treasury curve bootstrapped from `rows` priced on `side` ("bid",
     "ask" or "mid") as of `valuation_date`: zero rates and instantaneous
     forwards on a plot grid, each node with its zero rate and residual, and
-    constant-maturity par yields at the standard tenors the curve reaches.
+    par yields on `basis`.
+
+    On the "cmt" basis a par yield is read at each standard tenor the curve
+    reaches, for a bond maturing exactly that tenor from `valuation_date`.
+    On the "otr" basis it is read at each tenor a priced row's `tenor`
+    names, for that row's own security; `par.missing` lists the tenors the
+    "cmt" basis reaches that no such row stands for.
 
     Rates are in percent: zero rates and forwards continuously compounded,
     par yields semiannual. A row without a `side` price is left out of the
@@ -290,6 +305,7 @@ def bootstrap(rows, valuation_date, side):
     try:
         as_of = date.fromisoformat(valuation_date)
         price_side = SIDES[side]
+        par_basis = BASES[basis]
         entries, terms = [], {}
         for row in rows:
             try:
@@ -316,7 +332,8 @@ def bootstrap(rows, valuation_date, side):
     )
     engine = CalculationEngine(as_of, mdp=mdp, rdp=_TableReferenceDataProvider(terms))
     curve_request = BootstrappedCurveRequest(CURVE_ID, price_side)
-    tenors = _get_par_tenors(priced, as_of)
+    reached = _get_par_tenors(priced, as_of)
+    tenors = reached if par_basis is ParTenorBasis.CONSTANT_MATURITY else _get_on_the_run_tenors(priced)
     # A cubic spline needs three points; a curve of bills alone may reach only
     # two standard tenors, which are joined linearly.
     par_request = None
@@ -325,6 +342,7 @@ def bootstrap(rows, valuation_date, side):
             source=CURVE_ID,
             tenors=tenors,
             interpolator=Interpolator.CUBIC_SPLINE if len(tenors) >= 3 else Interpolator.LINEAR,
+            basis=par_basis,
             price_side=price_side,
         )
     engine.add([curve_request] + ([par_request] if par_request else []))
@@ -356,7 +374,10 @@ def bootstrap(rows, valuation_date, side):
     }
 
     if par_request is None:
-        result["par_error"] = "The curve reaches fewer than two standard tenors, too few for a par yield curve."
+        if par_basis is ParTenorBasis.CONSTANT_MATURITY:
+            result["par_error"] = "The curve reaches fewer than two standard tenors, too few for a par yield curve."
+        else:
+            result["par_error"] = "Fewer than two on-the-run securities are priced, too few for a par yield curve."
         return result
     par_built = engine.market_object_results[par_request.get_market_object_id()]
     if not par_built.built:
@@ -372,5 +393,8 @@ def bootstrap(rows, valuation_date, side):
         ],
         "grid": par_grid.tolist(),
         "values": [par_curve.get_par_yield(float(t)).value * 100 for t in par_grid],
+        "missing": [
+            {"tenor": tenor.label, "t": int(tenor) / 12} for tenor in reached if tenor not in par_request.tenors
+        ],
     }
     return result
